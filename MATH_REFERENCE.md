@@ -109,3 +109,60 @@ $$I_{GHK} = P z^2 \frac{F^2 V}{R T} \cdot \frac{c_{in} - c_{out} e^{-\alpha}}{1 
 Fixed-step RK4 with $dt = 0.5\text{ ms}$ ($\tau / dt \approx 20$). The loop runs over time
 steps only. Each step is vectorized over all cells and the batch dimension. The
 complete trajectory is differentiable (backpropagation through time).
+
+## 6. Ion-level model (`bioelectrics.ionic`)
+
+State per cell: intracellular concentrations $c_k$ [mol/m³] of $k \in$ {Na⁺, K⁺, Cl⁻,
+Ca²⁺, M⁻, P⁻} and the gates $m, h$ of every expressed channel. The bath is fixed.
+
+### Membrane potential from net charge (BETSE `sim.py`, `update_V`)
+
+$$V_{mem} = \frac{F \, \mathrm{vol}}{C_m \, A} \sum_k z_k c_k$$
+
+The profiles are charge-balanced with the anion M⁻, so $V_{mem}(0) = 0$. With
+$r = 5\,\mu$m and $C_m = 0.01$ F/m², $F\,\mathrm{vol}/(C_m A) \approx 16$ V per mol/m³:
+100 mV is a net charge of only about 6 µM.
+
+### Membrane flux (BETSE `sim_toolbox.electroflux`)
+
+$$J_k = P_k \, \frac{a_k \left(c_k^{out} e^{-a_k} - c_k\right)}{1 - e^{-a_k}}, \qquad
+a_k = \frac{z_k F V_{mem}}{R T}, \qquad
+P_k = \frac{D_{m,k} + \sum_{ch} P^{ch}_{open} \, \rho^{ch}_k \, D^{ch}_{max}}{d_m}$$
+
+$J_k > 0$ is influx. $P_{open} = m^p h^q$ with $\dot m = (m_\infty(V) - m)/\tau_m(V)$.
+$\rho_k$ is the relative permeability of the channel for ion $k$.
+
+### Pumps (BETSE `pumpNaKATP`, `pumpCaATP`)
+
+$$J_{Na} = -3\,\alpha_{NaK}\, \phi_{NaK} \left(1 - \frac{Q}{K_{eq}}\right), \qquad J_K = -\tfrac{2}{3} J_{Na}, \qquad
+K_{eq} = \exp\!\left(-\frac{\Delta G_{ATP}}{RT} + \frac{F V_{mem}}{RT}\right)$$
+
+with $\Delta G_{ATP} = -37$ kJ/mol, Michaelis–Menten saturation $\phi_{NaK}$ and reaction
+quotient $Q$ as in BETSE. The Ca-ATPase has the same form with charge 2.
+
+### Gap junctions (BETSE `update_gj`, `gap_junction.py`)
+
+Flux into cell $i$ from neighbour $j$ over contact area $A_{ij}$: GHK flux with
+$c^{out} = c_j$, $V = V_i - V_j$ and
+
+$$P^{gj}_k = \frac{D^{free}_k \, f_{gj} \, g_{open}(V_i - V_j)}{L_{gj}}, \qquad
+g_{open} = g_{min} + \frac{1}{1 + e^{(V - V_{th})/w}} - \frac{1}{1 + e^{(V + V_{th})/w}}$$
+
+Defaults (BETSE): $f_{gj} = 5\times10^{-8}$, $L_{gj} = 26$ nm, $V_{th} = w = 15$ mV,
+$g_{min} = 0.1$. Electrical coupling is fast (about 30 s⁻¹ per junction); salt
+diffusion through junctions is slow (time constant about 45 min).
+
+### Time scales and solvers
+
+The membrane relaxes at up to about $10^3$ s⁻¹ with strong channel expression, while
+concentrations change over minutes. The default solver is adaptive Dormand–Prince
+5(4) with a pure absolute tolerance of $10^{-7}$ mol/m³ on concentrations (about
+2 µV per step on $V_{mem}$). A linearly implicit ROS2 solver (Verwer et al. 1999)
+with a per-cell Jacobian is available as `method="rosenbrock"`.
+
+### Validation (tests/test_ionic_physics.py)
+
+- K⁺-only membrane, no pumps: $V_{mem}$ converges to the Nernst potential (0.2 mV).
+- Monovalent ions, no pumps: $V_{mem}$ converges to the GHK voltage equation (0.2 mV).
+- Gap junction transport conserves every ion species (relative error $< 10^{-12}$).
+- Grid and graph topologies give identical right-hand sides.

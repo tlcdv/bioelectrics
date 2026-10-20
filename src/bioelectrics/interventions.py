@@ -77,8 +77,16 @@ class Intervention:
         raise NotImplementedError
 
     def describe(self) -> dict:
+        """Summary for a protocol table.
+
+        For a spatial intervention, a cell counts as targeted when its value is at
+        least 10 % of the maximum; ``value`` is the mean over targeted cells.
+        """
         f = self.field().detach()
-        active = f.abs() > 1e-3 * max(abs(self.hi), abs(self.lo), 1e-30)
+        if f.dim() and self.spatial:
+            active = f >= 0.1 * f.max()
+        else:
+            active = f.abs() > 1e-3 * max(abs(self.hi), abs(self.lo), 1e-30)
         return {
             "intervention": self.kind,
             "target": self.target,

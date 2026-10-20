@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If you use bioelectrics in your research, please cite it as below, and cite the papers of the models you use (see the model zoo and THIRD_PARTY_NOTICES.md)."
+title: "bioelectrics: a differentiable engine for somatic bioelectricity"
+type: software
+authors:
+  - name: "The bioelectrics contributors"
+version: 0.2.0
+license: MIT
+repository-code: "https://github.com/tlcdv/bioelectrics"
+keywords:
+  - bioelectricity
+  - membrane potential
+  - gap junctions
+  - morphogenesis
+  - differentiable simulation
+  - PyTorch
+references:
+  - type: article
+    authors:
+      - family-names: Pietak
+        given-names: Alexis
+      - family-names: Levin
+        given-names: Michael
+    title: "Exploring instructive physiological signaling with the bioelectric tissue simulation engine"
+    journal: "Frontiers in Bioengineering and Biotechnology"
+    volume: 4
+    start: 55
+    year: 2016
+    doi: 10.3389/fbioe.2016.00055
+  - type: article
+    authors:
+      - family-names: Cervera
+        given-names: Javier
+      - family-names: Alcaraz
+        given-names: Antonio
+      - family-names: Mafe
+        given-names: Salvador
+    title: "Bioelectrical signals and ion channels in the modeling of multicellular patterns and cancer biophysics"
+    journal: "Scientific Reports"
+    volume: 6
+    start: 20403
+    year: 2016
+    doi: 10.1038/srep20403

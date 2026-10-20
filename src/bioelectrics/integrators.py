@@ -163,8 +163,9 @@ def integrate_rosenbrock(
         h = max(h_free, h * factor) if (clipped and err_norm <= 1.0) else h * factor
         if h < 1e-14:
             raise FloatingPointError(f"integrate_rosenbrock: step size underflow at t = {t:.4g} s")
-    if t_eval:
-        return v, torch.tensor(out_t, dtype=v0.dtype), torch.stack(out_v), stats
+    if t_eval is not None:
+        traj = torch.stack(out_v) if out_v else v0.new_zeros((0, *v0.shape))
+        return v, torch.tensor(out_t, dtype=v0.dtype), traj, stats
     return v, None, None, stats
 
 
@@ -240,6 +241,7 @@ def integrate_adaptive(
         h = max(h_free, h * factor) if (clipped and err_norm <= 1.0) else h * factor
         if h < 1e-14:
             raise FloatingPointError(f"integrate_adaptive: step size underflow at t = {t:.4g} s")
-    if t_eval:
-        return v, torch.tensor(out_t, dtype=v0.dtype), torch.stack(out_v), stats
+    if t_eval is not None:
+        traj = torch.stack(out_v) if out_v else v0.new_zeros((0, *v0.shape))
+        return v, torch.tensor(out_t, dtype=v0.dtype), traj, stats
     return v, None, None, stats

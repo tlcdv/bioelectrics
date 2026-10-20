@@ -1,58 +1,47 @@
 # bioelectrics
 
-**Differentiable Somatic Bioelectricity Engine.** A PyTorch library that models
-non-neural bioelectric networks: resting potential $V_{mem}$, voltage-gated ion
-channels, and voltage-gated gap junctions. It solves the **Bioelectric Inverse
-Problem** with automatic differentiation (backpropagation through time).
+**A differentiable engine for somatic bioelectricity, in PyTorch.**
 
-The model follows the work of Michael Levin, Alexis Pietak (BETSE), Javier Cervera,
-and Salvador Mafe (the Cervera–Alcaraz–Mafe, or CAM, bistable cell model).
+`bioelectrics` simulates the membrane potential (V_mem) of non-neural tissues at the
+level of ions, channels, pumps and gap junctions, and computes exact gradients of any
+outcome with respect to any parameter. It uses these gradients for the **bioelectric
+inverse problem**: which experimentally realizable intervention (a channel mRNA, a
+drug dose, a gap junction blocker, a light pattern), applied for a short time, moves a
+tissue into a target V_mem pattern that then persists on its own?
 
-![Inverse reprogramming result](assets/inverse_reprogramming_result.png)
+The library builds on the work of Michael Levin's lab, Alexis Pietak (BETSE), and
+Javier Cervera and Salvador Mafe. See [Related tools](#related-tools) for what it
+takes from them and what it adds.
 
-*(A) Bistable single-cell I–V curve. (B) A depolarized tumor domain isolated by closed
-gap junctions (black lines). (C) BPTT loss and the optimized stimulus, averaged over
-$[0, T_{stim}]$. (D) The tissue holds the healthy polarized attractor at $T_{relax}$,
-after the stimulus has ended. All gap junctions are open again.*
+![Inverse design of interventions on an ion-level tissue](assets/ionic_tumor_normalization.png)
 
-## Concepts
+*(A) An ion-level cell (GHK fluxes, pumps, a K⁺ inward rectifier and a depolarizing cation
+channel) has two attractors. (B) A depolarized "tumor" domain is isolated by closed
+voltage-gated gap junctions. (C) An optimized bath drug, given for 0.1 s and then washed
+out, flips the tumor cells into the healthy attractor. (D) An optimized light pattern for
+an anion channelrhodopsin concentrates the light on the tumor. (E) The tissue after the
+light is off. (F) Optimization by backpropagation through the simulation.*
 
-Details are in [`DOMAIN_CONCEPTS.md`](DOMAIN_CONCEPTS.md).
+Results of this demo (16×16 cells, 31 tumor cells):
 
-- **Hardware vs. software.** The genome specifies the hardware: channel and gap
-  junction expression (`ChannelProfile`, `GapJunctionProfile`). The $V_{mem}$
-  distribution is the software (`BioelectricState`). The software stores pattern
-  memory and can be rewritten without a change to DNA.
-- **Target Morphology as an attractor.** A tissue stores a spatial $V_{mem}$ prepattern
-  as a dynamical attractor. `PatternOptimizer` is an error-minimizing homeostatic
-  controller. It moves the tissue from a corrupted basin of attraction into the target
-  morphogenetic attractor.
-- **Subroutine calls.** An intervention is a brief trigger. Every control simulation
-  has an active phase $[0, T_{stim}]$ and a zero-stimulus phase $[T_{stim}, T_{relax}]$.
-  The error is measured at $T_{relax}$, so success proves a permanent attractor switch,
-  not a forced clamp.
-- **Computational boundary of the self.** A depolarized tumor (about −15 mV) next to
-  healthy tissue (about −70 mV) creates a high transjunctional voltage. This closes
-  the gap junctions ($G_{ij} \to G_{min}$) and isolates the tumor. Re-polarization
-  re-opens the junctions and normalizes the tissue.
+| Protocol | Optimized intervention | RMS error at 0.5 s |
+|---|---|---|
+| Drug | block 67 % of the depolarizing channel in the bath for 0.1 s, then wash out | 26.1 → 0.41 mV (98.4 % lower) |
+| Light | light on 32 cells (mean opsin open probability 0.22 on the tumor, 0.003 elsewhere) for 0.1 s | 26.1 → 0.41 mV (98.4 % lower) |
 
-## Equations
+The full protocol tables are in [`assets/ionic_protocols.md`](assets/ionic_protocols.md).
 
-Details and BETSE source references are in [`MATH_REFERENCE.md`](MATH_REFERENCE.md).
-All internal math is in SI units (V, A, s, F, S).
+## What you can do with it
 
-$$C_m \frac{dV_i}{dt} = -I_{pol}(V_i) - I_{dep}(V_i) - I_{leak}(V_i) + \sum_{j \in N(i)} G_{ij}(V_i - V_j) \cdot (V_j - V_i) + I_{ext, i}(t)$$
-
-$$I_{pol}(V) = \frac{G_{pol}^0 (V - E_{pol})}{1 + \exp\left(\frac{z (V - V_{th, pol})}{V_T}\right)}, \qquad
-I_{dep}(V) = \frac{G_{dep}^0 (V - E_{dep})}{1 + \exp\left(\frac{-z (V - V_{th, dep})}{V_T}\right)}$$
-
-$$G_{ij}(V_{ij}) = G_{min} + \frac{G_{max} - G_{min}}{1 + \exp\left(\frac{\vert V_{ij}\vert - V_0}{V_{width}}\right)}$$
-
-with $E_{pol} = -0.080\text{ V}$, $E_{dep} = 0\text{ V}$, and $V_T = RT/F \approx 0.0267\text{ V}$
-at $T = 310.15\text{ K}$.
-
-The default `ChannelProfile` gives two stable fixed points, −70 mV (polarized) and
-−20 mV (depolarized), with a saddle at −45 mV.
+| Task | API |
+|---|---|
+| Simulate V_mem, Na⁺/K⁺/Cl⁻/Ca²⁺ concentrations and channel gates in a tissue (grid or any graph) | `bioelectrics.ionic.IonicTissue` |
+| Use BETSE-compatible physics: GHK electrodiffusion, Na/K- and Ca-ATPase, voltage-gated electrodiffusive gap junctions | `bioelectrics.ionic` |
+| Express gated channels from a library (Kv1.5, Kir2.1, HCN2, Cav1.2, leaks, CAM-type channels) | `bioelectrics.ionic.LIBRARY` |
+| Get gradients of any V_mem outcome with respect to channel expression, pump rates, gap junction density | `torch.autograd` through the solvers |
+| Design interventions and print them as a lab protocol | `bioelectrics.interventions.InterventionOptimizer` |
+| Run published models and their reproduction tests | `bioelectrics.zoo` |
+| Use the fast voltage-level (CAM) model for large tissues | `bioelectrics.Tissue`, `PatternOptimizer` |
 
 ## Installation
 
@@ -60,79 +49,125 @@ The default `ChannelProfile` gives two stable fixed points, −70 mV (polarized)
 git clone https://github.com/tlcdv/bioelectrics.git
 cd bioelectrics
 python -m venv .venv
-.venv/bin/pip install -e ".[dev]"
+.venv/bin/pip install -e ".[dev]"      # Windows: .venv\Scripts\pip
+.venv/bin/python -m pytest             # about 3 minutes on a laptop CPU
 ```
 
-On Windows, use `.venv\Scripts\pip`. Requires Python ≥ 3.10 and PyTorch ≥ 2.0.
+Requires Python ≥ 3.10 and PyTorch ≥ 2.0. A GPU is not required.
 
-## Quickstart
+## Quickstart: design a drug protocol
 
 ```python
 import torch
-from bioelectrics import ChannelProfile, Tissue, find_fixed_points, tumor_prepattern
-from bioelectrics.control import PatternOptimizer
+from bioelectrics.ionic import IonicTissue, ChannelExpression, K_IR_CAM, CAT_DEP_CAM
+from bioelectrics.interventions import ChannelBlocker, InterventionOptimizer
 
-# Hardware: default bistable channels and voltage-gated gap junctions.
-tissue = Tissue()
-v_healthy = find_fixed_points(ChannelProfile())[0][0]  # about -0.070 V
+# Hardware: each cell expresses a K+ inward rectifier and a depolarizing cation channel.
+tissue = IonicTissue(channels=[ChannelExpression(K_IR_CAM, 1e-16),
+                               ChannelExpression(CAT_DEP_CAM, 1e-16)])
 
-# Software: a 32x32 polarized tissue with a 10x10 depolarized tumor.
-state, mask = tumor_prepattern(32, 32, patch=10, v_healthy_mV=-70.0, v_tumor_mV=-15.0)
+# Software: an 8x8 tissue at -78 mV with a 2x2 depolarized domain at -3 mV.
+v0 = torch.full((1, 8, 8), -0.078, dtype=torch.float64)
+v0[:, 3:5, 3:5] = -0.003
+state = tissue.simulate(tissue.with_vmem(tissue.initial_state((8, 8)), v0), 0.5)
 
-# Forward simulation: the tumor persists behind closed gap junctions.
-print(tissue.simulate(state, duration=1.0).v_mV[0][mask].mean())  # about -21 mV
-
-# Inverse problem: find a 100 ms trigger that writes the healthy pattern.
-opt = PatternOptimizer(tissue, state.v, torch.full_like(state.v, v_healthy),
-                       t_stim=0.1, t_relax=0.5, lr=0.5)
-result = opt.optimize(n_iters=30, tol=1e-5)
-print(f"pattern error reduced by {100 * result.error_reduction:.1f}%")
+# Which dose of a bath-applied blocker of the depolarizing channel, given for 0.1 s and
+# then washed out, puts every cell into the healthy attractor by t = 0.5 s?
+opt = InterventionOptimizer(tissue, state, torch.full_like(v0, -0.078),
+                            [ChannelBlocker("Cat_dep(CAM)", cost=1.0)], t_stim=0.1, t_relax=0.5)
+print(opt.optimize(n_iters=30, tol_mV=1.0).protocol.to_markdown())
 ```
 
-Run the full demo (writes `assets/inverse_reprogramming_result.png`):
+### Examples
 
-```bash
-python examples/tumor_reprogramming_demo.py
-```
+| Script | What it shows | Output |
+|---|---|---|
+| [`examples/ionic_tumor_normalization.py`](examples/ionic_tumor_normalization.py) | Ion-level tissue: optimized drug dose and optimized optogenetic light pattern | `assets/ionic_tumor_normalization.png`, `assets/ionic_protocols.md` |
+| [`examples/tumor_reprogramming_demo.py`](examples/tumor_reprogramming_demo.py) | Voltage-level (CAM-type) tissue: optimized current stimulus I_ext(t, x, y) | `assets/inverse_reprogramming_result.png` |
 
-## Package layout
+## Concepts
 
-| Module | Content |
+The API uses the terms of [`DOMAIN_CONCEPTS.md`](DOMAIN_CONCEPTS.md), after Levin &
+Martyniuk (2018) and Levin (2019):
+
+- **Hardware and software.** Channel and gap junction expression (`ChannelExpression`,
+  `IonicTissue` parameters) is the hardware. The V_mem pattern (`IonicState`,
+  `BioelectricState`) is the software, which stores pattern memory.
+- **Target morphology as an attractor.** The optimizers are error-minimizing controllers
+  that move a tissue from one basin of attraction into a target attractor.
+- **Triggers, not clamps.** Every inverse design has an intervention phase `[0, T_stim]`
+  and an intervention-free phase `[T_stim, T_relax]`. The error is measured at `T_relax`,
+  so a solution must be a permanent attractor switch.
+- **Computational boundary of the self.** A large transjunctional voltage closes gap
+  junctions and isolates a depolarized domain; re-polarization re-opens them.
+
+## Physics and validation
+
+Equations, parameters and their sources are in [`MATH_REFERENCE.md`](MATH_REFERENCE.md).
+All internal math is in SI units. The tests check the physics against analytic results
+and published results:
+
+| Test file | What it checks |
 |---|---|
-| `constants.py` | SI constants, mV ↔ V converters |
-| `channels.py` | `ChannelProfile`, $I_{pol}$, $I_{dep}$, $I_{leak}$, GHK current, fixed points |
-| `gap_junctions.py` | Voltage-gated $G_{ij}$, grid and graph coupling |
-| `tissue.py` | `BioelectricState`, `Tissue`, `tumor_prepattern` |
-| `integrators.py` | Differentiable Euler and RK4 |
-| `control.py` | `PatternOptimizer`, `OptimizationResult` |
-| `viz.py` | I–V curves, $V_{mem}$ maps, loss and stimulus plots |
+| `test_ionic_physics.py` | Nernst and GHK voltage limits, pump stoichiometry and sign, mass and charge conservation in gap junctions, BETSE gap junction gating formula, grid = graph, gradients |
+| `zoo/test_cam2016.py` | Cervera et al. (2016): fixed points (−58.6, −15.5, −7.5 mV), Fig. 4 (normalization depends on coupling), Fig. 5 (channel over-expression blocks normalization) |
+| `test_interventions.py` | The tumor is a stable attractor; an optimized drug dose normalizes it permanently; an optimized light pattern targets the tumor |
+| `test_single_cell.py`, `test_tissue_domains.py`, `test_inverse_control.py` | Voltage-level model: bistability, domain walls, current-stimulus inverse control |
 
-All ODE evaluations are vectorized over cells and batch dimensions
-(`(batch, H, W)` or `(batch, N_cells)`). Every biophysical parameter can have
-`requires_grad=True`.
+## Related tools
 
-## Tests
+| Tool | What it is | Relation to this library |
+|---|---|---|
+| [BETSE](https://gitlab.com/betse/betse) (Pietak & Levin) | Full bioelectric tissue simulator: electrodiffusion, extracellular space, gene and metabolic networks, GUI (BETSEE) | The ion-level physics here is ported from BETSE (BSD-2-Clause, see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)). BETSE is far more complete; this library adds gradients and inverse design, and has no extracellular space model yet. |
+| [BioElectricNetwork](https://github.com/santamanicka/BioElectricNetwork) (Manicka & Levin 2019) | Minimal bioelectric networks trained with backpropagation and genetic algorithms (logic gates, pattern detection) | Pioneered gradient training of bioelectric networks. This library is a general, tested package with BETSE-level physics and lab-realizable interventions. BEN is not yet in the zoo (see below). |
+| [ElectricMorphogenesis](https://github.com/santamanicka/ElectricMorphogenesis) (Manicka & Levin 2025) | Bioelectric field models of tissue-level voltage patterning, trained with backpropagation | Complementary: it models endogenous electric fields, which this library does not yet include. |
+| Cervera, Alcaraz & Mafe models | Bistable cell model and multicellular patterns (Sci. Rep. 2016 and later) | Implemented in `bioelectrics.zoo.cam2016` with reproduction tests; CAM-type gating is also available at ion level. |
 
-```bash
-pytest --cov=bioelectrics
-```
+## Limitations and roadmap
 
-| Test file | What it verifies |
-|---|---|
-| `test_single_cell.py` | Bistability, permanent switching by a brief pulse, gradient flow |
-| `test_tissue_domains.py` | Passive equalization, 32×32 domain wall isolation, ungated control |
-| `test_inverse_control.py` | ≥ 85 % pattern error reduction, tumor erased and held without stimulus |
-| `test_viz.py` | Figure generation |
+Present limitations, stated so that results are not over-read:
+
+- The extracellular space is a fixed bath (as BETSE without `is_ecm`). There are no
+  extracellular electric fields or extracellular diffusion.
+- The CAM-type channels used for bistability are phenomenological, not models of one
+  specific protein. The BETSE Kir2.1 model alone does not give bistability with the
+  default profile.
+- Drug interventions are parameterized by blocked fraction, or by a user-supplied IC50
+  and Hill coefficient. The library does not contain drug potency data.
+- BPTT cost grows with simulated time; long rollouts on large ion-level grids are slow on
+  a CPU (an 8×8 tissue: about 4 s per optimization iteration for a 0.5 s rollout).
+
+Planned:
+
+- BEN (Manicka & Levin 2019) in the zoo. The equations in its Fig. 8 have inconsistent
+  units and signs, so an exact reproduction needs confirmation from the authors.
+- Implicit differentiation through steady states (gradients of attractors without BPTT).
+- Higher-order stiff solvers, GPU benchmarks, Voronoi cell meshes from segmented images.
+- Gene regulatory network coupling (V_mem → expression → channels).
+- Fitting model parameters to voltage-dye (DiBAC, CC2-DMPE) images.
+
+## Contributing and citation
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). If you use the library, cite it with
+[`CITATION.cff`](CITATION.cff), and cite the papers of the models you use.
 
 ## References
 
 - Levin, M. & Martyniuk, C. J. (2018). The bioelectric code: An ancient computational
   medium for dynamic control of growth and form. *BioSystems* 164, 76–93.
-- Levin, M. (2019). The computational boundary of a "self": Developmental
-  bioelectricity drives multicellularity and scale-free cognition.
-  *Frontiers in Psychology* 10, 2688.
-- Cervera, J., Alcaraz, A. & Mafe, S. (2016). Bioelectrical signals and ion channels in
-  the modeling of multicellular patterns and cancer biophysics. *Scientific Reports* 6, 20403.
+- Levin, M. (2019). The computational boundary of a "self": Developmental bioelectricity
+  drives multicellularity and scale-free cognition. *Frontiers in Psychology* 10, 2688.
 - Pietak, A. & Levin, M. (2016). Exploring instructive physiological signaling with the
-  bioelectric tissue simulation engine (BETSE). *Frontiers in Bioengineering and
-  Biotechnology* 4, 55.
+  bioelectric tissue simulation engine. *Frontiers in Bioengineering and Biotechnology* 4, 55.
+- Cervera, J., Alcaraz, A. & Mafe, S. (2016). Bioelectrical signals and ion channels in the
+  modeling of multicellular patterns and cancer biophysics. *Scientific Reports* 6, 20403.
+- Manicka, S. & Levin, M. (2019). Modeling somatic computation with non-neural bioelectric
+  networks. *Scientific Reports* 9, 18612.
+- Verwer, J. G., Spee, E. J., Blom, J. G. & Hundsdorfer, W. (1999). A second-order
+  Rosenbrock method applied to photochemical dispersion problems. *SIAM J. Sci. Comput.* 20,
+  1456–1480.
+
+## License
+
+MIT. Parts of `src/bioelectrics/ionic/` are derived from BETSE (BSD-2-Clause); see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

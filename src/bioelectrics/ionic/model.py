@@ -358,14 +358,14 @@ class IonicTissue:
                 rhs, state.x, t_end, make, t0=state.t, rtol=rtol, atol=atol, dt0=dt, dt_max=dt_max, t_eval=t_eval
             )
             out = IonicState(x_end, t_end)
-            return (out, times, traj) if t_eval else out
+            return (out, times, traj) if t_eval is not None else out
         if method == "dopri5":
             rtol, atol = self.tolerances(state.x)
             x_end, times, traj, self.last_stats = integrate_adaptive(
                 rhs, state.x, t_end, t0=state.t, rtol=rtol, atol=atol, dt0=dt, dt_max=dt_max, t_eval=t_eval
             )
             out = IonicState(x_end, t_end)
-            return (out, times, traj) if t_eval else out
+            return (out, times, traj) if t_eval is not None else out
         x_end, times, traj = integrate(
             rhs, state.x, t_end, dt, t0=state.t, method=method, record_every=record_every
         )

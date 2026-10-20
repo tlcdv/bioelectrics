@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bioelectrics"
-version = "0.1.0"
-description = "Differentiable Somatic Bioelectricity Engine: V_mem dynamics, voltage-gated gap junctions and inverse pattern control in PyTorch"
+version = "0.2.0"
+description = "Differentiable somatic bioelectricity: ion-level tissue physics, published model zoo, and inverse design of lab interventions in PyTorch"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

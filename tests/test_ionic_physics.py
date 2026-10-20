@@ -164,3 +164,36 @@ def test_modifiers_block_channels_and_pumps():
     v_ouabain = tissue.vmem_of(tissue.simulate(s0, 1.0, dt=1e-3, modifiers=Modifiers(nak_scale=0.0))).item()
     assert v_block > v_ctrl + 0.005
     assert v_ouabain > v_ctrl
+
+
+def test_adaptive_solver_records_requested_times():
+    tissue = single_cell()
+    state = tissue.initial_state((1,))
+    out, times, traj = tissue.simulate(state, 0.2, t_eval=[0.0, 0.05, 0.1, 0.2])
+    assert times.tolist() == pytest.approx([0.0, 0.05, 0.1, 0.2])
+    assert traj.shape[0] == 4 and torch.equal(traj[-1], out.x)
+    _, times, traj = tissue.simulate(out, 0.1, t_eval=[0.0])  # all requested times before t0
+    assert times.numel() == 0 and traj.shape[0] == 0
+
+
+def test_rosenbrock_solver_agrees_with_dopri5():
+    from bioelectrics.ionic import CAT_DEP_CAM, K_IR_CAM
+
+    tissue = IonicTissue(channels=[ChannelExpression(K_IR_CAM, 1e-16), ChannelExpression(CAT_DEP_CAM, 1e-16)])
+    v0 = torch.full((1, 3, 3), -0.078, dtype=DTYPE)
+    v0[:, 1, 1] = -0.003
+    s0 = tissue.with_vmem(tissue.initial_state((3, 3)), v0)
+    v_ref = tissue.vmem_of(tissue.simulate(s0, 0.2, method="dopri5"))
+    v_ros = tissue.vmem_of(tissue.simulate(s0, 0.2, method="rosenbrock"))
+    assert (v_ref - v_ros).abs().max().item() < 1e-5  # 10 uV
+    # Gradients flow through the linearly implicit steps.
+    max_d = torch.tensor(1e-16, dtype=DTYPE, requires_grad=True)
+    t2 = IonicTissue(channels=[ChannelExpression(K_IR_CAM, max_d), ChannelExpression(CAT_DEP_CAM, 1e-16)])
+    t2.vmem_of(t2.simulate(s0, 0.02, method="rosenbrock")).mean().backward()
+    assert torch.isfinite(max_d.grad) and max_d.grad.abs().item() > 0
+
+
+def test_fixed_step_solver_reports_instability():
+    tissue = single_cell(channels=[ChannelExpression(KIR2P1, 1e-15)])
+    with pytest.raises(FloatingPointError):
+        tissue.simulate(tissue.initial_state((1,)), 1.0, dt=5e-3, method="rk4")

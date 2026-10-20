@@ -33,3 +33,23 @@ def test_reprogramming_figure_written(tmp_path):
                                     result, 0.1, 0.5, str(out))
     assert out.exists() and out.stat().st_size > 10_000
     plt.close(fig)
+
+
+def test_ionic_plots(tmp_path):
+    from bioelectrics.ionic import CAT_DEP_CAM, K_IR_CAM, ChannelExpression, IonicTissue
+    from bioelectrics.viz import ionic_iv_curve, plot_field_map, plot_ionic_iv, plot_ionic_vmem_map
+
+    cell = IonicTissue(edges=torch.zeros(2, 0, dtype=torch.long),
+                       channels=[ChannelExpression(K_IR_CAM, 1e-16), ChannelExpression(CAT_DEP_CAM, 1e-16)])
+    v, i = ionic_iv_curve(cell)
+    crossings = int((torch.sign(i[:-1]) != torch.sign(i[1:])).sum())
+    assert crossings == 3  # stable, saddle, stable
+    v_map = torch.full((6, 6), -0.078, dtype=torch.float64)
+    v_map[2:4, 2:4] = -0.003
+    fig, (a, b, c) = plt.subplots(1, 3)
+    plot_ionic_iv(a, cell)
+    _, n_closed = plot_ionic_vmem_map(b, v_map)
+    assert n_closed == 8  # boundary of a 2x2 domain
+    plot_field_map(c, torch.rand(6, 6))
+    fig.savefig(tmp_path / "ionic.png")
+    plt.close(fig)
