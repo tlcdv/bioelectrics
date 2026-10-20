@@ -29,7 +29,7 @@ import torch
 import torch.nn.functional as F_nn
 
 from ..constants import DTYPE, F, T
-from ..integrators import integrate, integrate_adaptive
+from ..integrators import integrate, integrate_adaptive, integrate_rosenbrock
 from .channel_library import GatedChannel
 from .profiles import IonProfile
 from .transport import betse_gj_open_fraction, ca_atpase_influx, ghk_influx, nak_atpase_influx
@@ -86,6 +86,16 @@ class Modifiers:
 
 
 NO_MODIFIERS = Modifiers()
+
+
+def _detached(m: Modifiers) -> Modifiers:
+    d = lambda v: v.detach() if isinstance(v, torch.Tensor) else v
+    return Modifiers(
+        channel_scale={k: d(v) for k, v in m.channel_scale.items()},
+        channel_add={k: d(v) for k, v in m.channel_add.items()},
+        channel_gate={k: d(v) for k, v in m.channel_gate.items()},
+        nak_scale=d(m.nak_scale), ca_pump_scale=d(m.ca_pump_scale), gj_scale=d(m.gj_scale),
+    )
 
 
 @dataclass
@@ -177,6 +187,23 @@ class IonicTissue:
             parts += [m.unsqueeze(1), h.unsqueeze(1)]
         return IonicState(torch.cat(parts, dim=1))
 
+    def with_vmem(self, state: IonicState, v: torch.Tensor, ion: str = "K") -> IonicState:
+        """Return a copy of ``state`` whose membrane potential is ``v`` [V].
+
+        Only the intracellular concentration of ``ion`` changes, by
+        ``dV / (F vol z / (C_m area))`` (about 6 uM for 100 mV). Gates are reset to
+        their steady state at ``v``.
+        """
+        x = state.x.clone()
+        k = self._ion[ion]
+        gain = F * self.geometry.volume / (self.c_m * self.geometry.area) * float(self._z[k])
+        x[:, k] = x[:, k] + (v - self.vmem(x[:, : self.n_ions])) / gain
+        v_new = self.vmem(x[:, : self.n_ions])
+        for idx, expr in enumerate(self.channels):
+            m, h = expr.channel.steady_state(v_new)
+            x[:, self.n_ions + 2 * idx], x[:, self.n_ions + 2 * idx + 1] = m, h
+        return IonicState(x, state.t)
+
     # -------------------------------------------------------------------- physics
     def _gap_junction_influx(self, c: torch.Tensor, v: torch.Tensor, mods: Modifiers) -> torch.Tensor:
         """Moles per second into each cell through gap junctions, ``(B, n_ions, *cells)``."""
@@ -205,8 +232,8 @@ class IonicTissue:
         out = torch.zeros_like(c)
         return out.index_add(-1, i, f).index_add(-1, j, -f)
 
-    def rhs(self, x: torch.Tensor, mods: Modifiers = NO_MODIFIERS) -> torch.Tensor:
-        """Time derivative of the packed state tensor."""
+    def rhs(self, x: torch.Tensor, mods: Modifiers = NO_MODIFIERS, gap_junctions: bool = True) -> torch.Tensor:
+        """Time derivative of the packed state tensor (``gap_junctions=False``: membrane terms only)."""
         c, gates = self.split(x)
         ndim = c.dim() - 2
         v = self.vmem(c)
@@ -244,17 +271,51 @@ class IonicTissue:
             pump[ica] = ca_atpase_influx(c[:, ica], c_out[:, ica], v, self.alpha_ca * mods.ca_pump_scale, self.temperature)
         pump = torch.stack(pump, dim=1)
 
-        dc = ((j + pump) * self.geometry.area + self._gap_junction_influx(c, v, mods)) / self.geometry.volume
+        flux = (j + pump) * self.geometry.area
+        if gap_junctions:
+            flux = flux + self._gap_junction_influx(c, v, mods)
+        dc = flux / self.geometry.volume
         return torch.cat([dc] + dgates, dim=1) if dgates else dc
 
     # ------------------------------------------------------------------ simulation
-    def tolerances(self, x: torch.Tensor, conc_atol: float = 1e-9, gate_atol: float = 1e-6):
-        """Per-component ``(rtol, atol)`` tensors for the adaptive solver.
+    def block_solver(self, x: torch.Tensor, mods: Modifiers, gamma_h: float):
+        """Return ``b -> (I - gamma_h J)^-1 b`` with ``J`` the per-cell membrane Jacobian.
+
+        ``J`` (``n x n`` per cell, ``n`` = ions + gates) is computed with forward
+        finite differences of the membrane terms: ``n + 1`` evaluations cover all
+        cells at once, because cells are uncoupled without gap junctions. Gap
+        junction coupling is left out (it is weak, and the W-method tolerates an
+        approximate Jacobian). ``J`` is detached from the autograd graph.
+        """
+        n = x.shape[1]
+        with torch.no_grad():
+            f0 = self.rhs(x, mods, gap_junctions=False)
+            cols = []
+            for j in range(n):
+                eps = 1e-7 * x[:, j].abs() + 1e-14
+                xp = x.clone()
+                xp[:, j] = xp[:, j] + eps
+                cols.append((self.rhs(xp, mods, gap_junctions=False) - f0) / eps.unsqueeze(1))
+            jac = torch.stack(cols, dim=2)  # (B, n_out, n_in, *cells)
+            perm = (0, *range(3, jac.dim()), 1, 2)
+            jac = jac.permute(perm)  # (B, *cells, n_out, n_in)
+            m = torch.eye(n, dtype=x.dtype) - gamma_h * jac
+            lu, piv = torch.linalg.lu_factor(m)
+
+        def solve(b: torch.Tensor) -> torch.Tensor:
+            bb = b.movedim(1, -1).unsqueeze(-1)  # (B, *cells, n, 1)
+            out = torch.linalg.lu_solve(lu, piv, bb).squeeze(-1)
+            return out.movedim(-1, 1)
+
+        return solve
+
+    def tolerances(self, x: torch.Tensor, conc_atol: float = 1e-7, gate_atol: float = 1e-5):
+        """Per-component ``(rtol, atol)`` tensors for the adaptive solvers.
 
         V depends on a small difference of large concentrations
         (dV/dc = F vol / (C_m area), about 16 V per mol/m^3), so concentrations get a
-        pure absolute tolerance: ``conc_atol = 1e-9`` mol/m^3 bounds the voltage
-        error per step to about 20 nV.
+        pure absolute tolerance: ``conc_atol = 1e-7`` mol/m^3 bounds the voltage
+        error per step to about 2 uV.
         """
         shape = [1, x.shape[1]] + [1] * (x.dim() - 2)
         atol = torch.full(shape, gate_atol, dtype=x.dtype)
@@ -290,6 +351,14 @@ class IonicTissue:
             mod_fn = lambda t: modifiers
         rhs = lambda t, x: self.rhs(x, mod_fn(t))
         t_end = state.t + duration
+        if method == "rosenbrock":
+            rtol, atol = self.tolerances(state.x)
+            make = lambda t, x, gh: self.block_solver(x, _detached(mod_fn(t)), gh)
+            x_end, times, traj, self.last_stats = integrate_rosenbrock(
+                rhs, state.x, t_end, make, t0=state.t, rtol=rtol, atol=atol, dt0=dt, dt_max=dt_max, t_eval=t_eval
+            )
+            out = IonicState(x_end, t_end)
+            return (out, times, traj) if t_eval else out
         if method == "dopri5":
             rtol, atol = self.tolerances(state.x)
             x_end, times, traj, self.last_stats = integrate_adaptive(

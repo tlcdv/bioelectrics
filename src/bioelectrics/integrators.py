@@ -89,6 +89,85 @@ _B4 = (5179 / 57600, 0.0, 7571 / 16695, 393 / 640, -92097 / 339200, 187 / 2100, 
 _E = tuple(b5 - b4 for b5, b4 in zip(_B5, _B4))
 
 
+#: ROS2 parameter gamma = 1 + 1/sqrt(2) (Verwer, Spee, Blom & Hundsdorfer, SIAM J. Sci. Comput. 20, 1999).
+_ROS2_GAMMA = 1.0 + 2.0**-0.5
+
+
+def integrate_rosenbrock(
+    rhs: RHS,
+    v0: torch.Tensor,
+    t_end: float,
+    make_solver: Callable[[float, torch.Tensor, float], Callable[[torch.Tensor], torch.Tensor]],
+    t0: float = 0.0,
+    rtol: float | torch.Tensor = 1e-6,
+    atol: float | torch.Tensor = 1e-9,
+    dt0: float = 1e-4,
+    dt_max: float = float("inf"),
+    t_eval: list[float] | None = None,
+    max_steps: int = 10_000_000,
+) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None, "SolverStats"]:
+    """Adaptive linearly implicit ROS2 integration for stiff systems.
+
+    ``make_solver(t, v, gamma_h)`` returns a function ``b -> (I - gamma_h J)^-1 b``
+    for an (approximate) Jacobian ``J`` of ``rhs`` at ``(t, v)``. ROS2 is a
+    W-method: it keeps order 2 with an approximate Jacobian, so ``J`` may omit
+    weak couplings and should be detached from the autograd graph. Gradients flow
+    through ``rhs`` and the linear solves. The error estimate compares ROS2 with
+    linearly implicit Euler.
+
+    Returns ``(v_final, times, trajectory, stats)``.
+    """
+    g = _ROS2_GAMMA
+    t, v, h = t0, v0, min(dt0, t_end - t0)
+    stats = SolverStats()
+    outputs = sorted(x for x in (t_eval or []) if t0 <= x <= t_end)
+    out_t, out_v = [], []
+    while outputs and outputs[0] <= t0:
+        out_t.append(outputs.pop(0))
+        out_v.append(v0)
+    f0 = rhs(t, v)
+    stats.n_rhs += 1
+    while t < t_end - 1e-15 * max(1.0, abs(t_end)):
+        if stats.n_accepted + stats.n_rejected >= max_steps:
+            raise RuntimeError("integrate_rosenbrock: max_steps reached")
+        target = min(t_end, outputs[0]) if outputs else t_end
+        h_free = min(h, dt_max)
+        h = min(h_free, target - t)
+        clipped = h < h_free
+        solve = make_solver(t, v.detach(), g * h)
+        k1 = solve(f0)
+        f1 = rhs(t + h, v + h * k1)
+        k2 = solve(f1 - 2.0 * k1)
+        stats.n_rhs += 1
+        v_new = v + h * (1.5 * k1 + 0.5 * k2)
+        err = 0.5 * h * (k1 + k2)
+        with torch.no_grad():
+            scale = atol + rtol * torch.maximum(v.abs(), v_new.abs())
+            ratio = (err / scale).abs()
+            ok = bool(torch.isfinite(ratio).all()) and bool(torch.isfinite(v_new).all())
+            err_norm = float(torch.sqrt(torch.mean(ratio**2))) if ok else float("inf")
+        if err_norm <= 1.0:
+            t = t + h
+            v = v_new
+            f0 = rhs(t, v)
+            stats.n_rhs += 1
+            stats.n_accepted += 1
+            stats.dt_min, stats.dt_max = min(stats.dt_min, h), max(stats.dt_max, h)
+            if outputs and abs(t - outputs[0]) <= 1e-12 * max(1.0, abs(t)):
+                out_t.append(outputs.pop(0))
+                out_v.append(v)
+            factor = 5.0 if err_norm == 0.0 else min(5.0, 0.9 * err_norm ** (-0.5))
+        else:
+            stats.n_rejected += 1
+            factor = 0.2 if err_norm == float("inf") else max(0.2, 0.9 * err_norm ** (-0.5))
+        h = max(h_free, h * factor) if (clipped and err_norm <= 1.0) else h * factor
+        if h < 1e-14:
+            raise FloatingPointError(f"integrate_rosenbrock: step size underflow at t = {t:.4g} s")
+    if t_eval:
+        return v, torch.tensor(out_t, dtype=v0.dtype), torch.stack(out_v), stats
+    return v, None, None, stats
+
+
 @dataclass
 class SolverStats:
     n_accepted: int = 0

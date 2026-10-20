@@ -114,6 +114,31 @@ CAV1P2 = GatedChannel(
 )
 
 
+def cam_type(
+    name: str, ions: tuple[str, ...], rel_perm: tuple[float, ...], v_half_mV: float = -25.0,
+    z: float = 3.0, opens_on_depolarization: bool = False, tau_ms: float = 1.0,
+) -> GatedChannel:
+    """Phenomenological channel with the steep Boltzmann gating of Cervera et al. (2016).
+
+    Open probability ``1 / (1 + exp(+-z (V - V_half) / V_T))``, with a fast gate
+    (``tau_ms``). It is not a model of one specific protein.
+    """
+    k = 26.727 / z  # V_T [mV] / z at 310.15 K
+    sign = -1.0 if opens_on_depolarization else 1.0
+    return GatedChannel(
+        name=name, ions=ions, rel_perm=rel_perm, m_power=1, h_power=0,
+        m_inf=lambda v: torch.sigmoid(-sign * (v - v_half_mV) / k),
+        m_tau=lambda v: torch.full_like(v, tau_ms),
+        reference="CAM-type gating, Cervera, Alcaraz & Mafe, Sci. Rep. 6, 20403 (2016)",
+    )
+
+
+#: Inward-rectifier K+ channel with CAM gating (open below -25 mV): polarizing.
+K_IR_CAM = cam_type("K_ir(CAM)", ("K",), (1.0,))
+#: Non-selective cation channel with CAM gating (open above -25 mV): depolarizing.
+CAT_DEP_CAM = cam_type("Cat_dep(CAM)", ("Na", "K"), (1.0, 1.0), opens_on_depolarization=True)
+
+
 def leak(ion: str) -> GatedChannel:
     """A constitutively open (ungated) channel for one ion."""
     return GatedChannel(
@@ -123,5 +148,5 @@ def leak(ion: str) -> GatedChannel:
 
 
 LIBRARY: dict[str, GatedChannel] = {
-    c.name: c for c in (KV1P5, KIR2P1, HCN2, CAV1P2, leak("K"), leak("Na"), leak("Cl"))
+    c.name: c for c in (KV1P5, KIR2P1, HCN2, CAV1P2, K_IR_CAM, CAT_DEP_CAM, leak("K"), leak("Na"), leak("Cl"))
 }
