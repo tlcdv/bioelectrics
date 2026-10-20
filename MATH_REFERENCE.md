@@ -41,11 +41,16 @@ A fixed point $V^*$ satisfies $I_{pol}(V^*) + I_{dep}(V^*) + I_{leak}(V^*) = 0$.
 It is stable when $dI_{ion}/dV > 0$ at $V^*$, and unstable when $dI_{ion}/dV < 0$.
 
 With equal thresholds ($V_{th,pol} = V_{th,dep}$), the ratio $G_{dep}(V)/G_{pol}(V)$ is a
-pure exponential in $V$. Then the cell has only one stable point. Two different
-thresholds make the ratio steeper in the middle of the voltage range. This gives three
-fixed points (bistability).
+pure exponential in $V$. The cell is then bistable only when its stable points lie
+close to $E_{pol}$ and $E_{dep}$. The published CAM parameters (Cervera, Alcaraz & Mafe
+2016: $V_{th} = -25$ mV, $z = 3$, $E_{pol} = -60$ mV, $E_{dep} = 0$) give −58.6, −15.5 and
+−7.5 mV (`bioelectrics.zoo.cam2016`). Stable points far from the reversal potentials,
+such as −70 and −20 mV with $E_{pol} = -80$ mV, need two different thresholds.
 
 ### Default `ChannelProfile` (calibrated by bounded Nelder–Mead fit)
+
+These defaults are **not** from a paper. They were fitted so that the stable points are
+−70 mV and −20 mV. For published parameters, use `bioelectrics.zoo.cam2016`.
 
 | Parameter | Value |
 |---|---|
