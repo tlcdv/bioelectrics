@@ -5,12 +5,15 @@ Subpackages and modules
 * ``bioelectrics.ionic``: ion-level physics (Na+, K+, Cl-, Ca2+; GHK fluxes, pumps,
   Hodgkin-Huxley channels, electrodiffusive gap junctions), BETSE-compatible.
 * ``bioelectrics.interventions``: channel misexpression, drugs, gap junction blockers,
-  optogenetics, and their inverse design (``InterventionOptimizer``).
+  optogenetics, and their inverse design (``InterventionOptimizer``,
+  ``ChronicInterventionOptimizer``).
+* ``bioelectrics.attractors``: steady states, stability, basins, dose ramps, and
+  implicit gradients of steady states.
 * ``bioelectrics.zoo``: published models with reproduction tests.
 * Voltage-level (CAM-type) models: ``ChannelProfile``, ``Tissue``, ``PatternOptimizer``.
 """
 
-from . import constants, interventions, ionic, zoo
+from . import attractors, constants, interventions, ionic, zoo
 from .channels import (
     ChannelProfile,
     find_fixed_points,

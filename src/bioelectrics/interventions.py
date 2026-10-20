@@ -13,6 +13,11 @@ Every rollout has two phases (see ``DOMAIN_CONCEPTS.md``):
 * ``[T_stim, T_relax]``: no intervention. The pattern error is measured at
   ``T_relax``, so success means a permanent attractor switch (a trigger).
 
+:class:`ChronicInterventionOptimizer` handles interventions that stay on (a
+constant drug concentration, a stable misexpression). Its readout is the steady
+state that the tissue reaches under the intervention, and its gradients come from
+the implicit function theorem (:mod:`bioelectrics.attractors`), not from BPTT.
+
 Each intervention parameter is bounded: ``value = lo + (hi - lo) * sigmoid(u)``,
 where ``u`` is the unconstrained optimization variable.
 """
@@ -191,21 +196,30 @@ class Optogenetic(Intervention):
 
 @dataclass
 class Protocol:
-    """An optimized intervention protocol in lab terms."""
+    """An optimized intervention protocol in lab terms.
+
+    ``chronic=True``: the interventions stay on and the readout is the steady state.
+    """
 
     steps: list[dict]
     t_stim: float
     t_relax: float
     baseline_error_mV: float
     final_error_mV: float
+    chronic: bool = False
 
     @property
     def error_reduction(self) -> float:
         return 1.0 - self.final_error_mV / self.baseline_error_mV
 
     def to_markdown(self) -> str:
+        head = (
+            "Protocol: apply continuously; read out at the steady state."
+            if self.chronic
+            else f"Protocol: apply for {self.t_stim:g} s, then remove; read out at {self.t_relax:g} s."
+        )
         lines = [
-            f"Protocol: apply for {self.t_stim:g} s, then remove; read out at {self.t_relax:g} s.",
+            head,
             "",
             "| # | Intervention | Target | Mean value | Max | Unit | Cells |",
             "|---|---|---|---|---|---|---|",
@@ -338,5 +352,97 @@ class InterventionOptimizer:
             t_relax=self.t_relax,
             baseline_error_mV=base_err,
             final_error_mV=float(self.pattern_error(v_final)) * 1e3,
+        )
+        return result
+
+
+class ChronicInterventionOptimizer:
+    """Find constant interventions whose steady state is a Target Morphology.
+
+    The interventions stay on. For each candidate, the tissue relaxes from
+    ``initial`` to its steady state (:func:`bioelectrics.attractors.steady_state_implicit`),
+    so the readout is the attractor that the start state reaches, at infinite time.
+    Loss = pattern error^2 / v_scale^2 + sum_i cost_i * magnitude_i. Gradients use one
+    sparse linear solve per iteration; the memory cost does not grow with time.
+
+    When an intervention parameter moves the start state into another basin, the
+    steady state jumps; the gradient describes the attractor on the current side of
+    the jump.
+    """
+
+    def __init__(
+        self,
+        tissue: IonicTissue,
+        initial: IonicState,
+        v_target: torch.Tensor,
+        interventions: list[Intervention],
+        lr: float = 0.3,
+        v_scale: float = 1e-3,
+        weight: torch.Tensor | None = None,
+        background: Modifiers | None = None,
+        solver_options: dict | None = None,
+    ) -> None:
+        if initial.x.shape[0] != 1:
+            raise ValueError("ChronicInterventionOptimizer needs batch size 1")
+        self.tissue, self.initial = tissue, initial
+        self.v_target = v_target.detach()
+        self.interventions = interventions
+        self.v_scale, self.weight = v_scale, weight
+        self.background = background or Modifiers()
+        self.solver_options = solver_options or {}
+        cell_shape = tuple(initial.x.shape[2:])
+        self.params = [iv.build(cell_shape) for iv in interventions]
+        self.optimizer = torch.optim.Adam(self.params, lr=lr)
+
+    modifiers = InterventionOptimizer.modifiers
+    pattern_error = InterventionOptimizer.pattern_error
+
+    def steady_vmem(self, active: bool = True) -> torch.Tensor:
+        """V_mem of the steady state reached from ``initial`` (differentiable when ``active``)."""
+        from .attractors import find_steady_state, steady_state_implicit
+
+        if not active:
+            ss = find_steady_state(self.tissue, self.initial, self.background, stability=False,
+                                   **self.solver_options)
+            return ss.vmem
+        x = steady_state_implicit(self.tissue, self.initial, self.modifiers, self.params, **self.solver_options)
+        return self.tissue.vmem_of(x)
+
+    def loss(self, v: torch.Tensor) -> torch.Tensor:
+        err = (self.pattern_error(v) / self.v_scale) ** 2
+        return err + sum(iv.cost * iv.normalized_magnitude() for iv in self.interventions)
+
+    def optimize(self, n_iters: int = 30, tol_mV: float | None = None, verbose: bool = False) -> InterventionResult:
+        v_base = self.steady_vmem(active=False)
+        base_err = float(self.pattern_error(v_base)) * 1e3
+        result = InterventionResult(protocol=None, v_baseline=v_base)
+        for it in range(n_iters):
+            self.optimizer.zero_grad()
+            v = self.steady_vmem()
+            loss = self.loss(v)
+            loss.backward()
+            scale = max(float(p.grad.abs().max()) for p in self.params if p.grad is not None)
+            if scale > 0:
+                for p in self.params:
+                    if p.grad is not None:
+                        p.grad.div_(scale)
+            self.optimizer.step()
+            err = float(self.pattern_error(v.detach())) * 1e3
+            result.loss_history.append(loss.item())
+            result.error_history_mV.append(err)
+            if verbose:
+                print(f"iter {it:3d}  loss {loss.item():.4e}  rms error {err:.3f} mV")
+            if tol_mV is not None and err < tol_mV:
+                break
+        with torch.no_grad():
+            v = self.steady_vmem().detach()
+        result.v_final = v
+        result.protocol = Protocol(
+            steps=[iv.describe() for iv in self.interventions],
+            t_stim=float("inf"),
+            t_relax=float("inf"),
+            baseline_error_mV=base_err,
+            final_error_mV=float(self.pattern_error(v)) * 1e3,
+            chronic=True,
         )
         return result

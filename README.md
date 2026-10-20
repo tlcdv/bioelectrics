@@ -43,6 +43,10 @@ The full protocol tables are in [`assets/ionic_protocols.md`](assets/ionic_proto
 | Express gated channels from a library (Kv1.5, Kir2.1, HCN2, Cav1.2, leaks, CAM-type channels) | `bioelectrics.ionic.LIBRARY` |
 | Get gradients of any V_mem outcome with respect to channel expression, pump rates, gap junction density | `torch.autograd` through the solvers |
 | Design interventions and print them as a lab protocol | `bioelectrics.interventions.InterventionOptimizer` |
+| Find steady states (pattern memories), their stability and slowest time scale, without long simulations | `bioelectrics.attractors.find_steady_state` |
+| Differentiate a steady state with respect to any parameter (implicit function theorem, one sparse solve) | `bioelectrics.attractors.steady_state_implicit` |
+| Map the attractor landscape: all patterns from many start states, basins, dose ramps with hysteresis | `enumerate_attractors`, `basin_map`, `dose_response` |
+| Design chronic interventions (constant dose, stable misexpression) whose steady state is the target | `bioelectrics.interventions.ChronicInterventionOptimizer` |
 | Run published models and their reproduction tests | `bioelectrics.zoo` |
 | Use the fast voltage-level (CAM) model for large tissues | `bioelectrics.Tissue`, `PatternOptimizer` |
 
@@ -86,6 +90,7 @@ print(opt.optimize(n_iters=30, tol_mV=1.0).protocol.to_markdown())
 | Script | What it shows | Output |
 |---|---|---|
 | [`examples/ionic_tumor_normalization.py`](examples/ionic_tumor_normalization.py) | Ion-level tissue: optimized drug dose and optimized optogenetic light pattern | `assets/ionic_tumor_normalization.png`, `assets/ionic_protocols.md` |
+| [`examples/attractor_landscape.py`](examples/attractor_landscape.py) | Hysteresis of a dose ramp, basins of two coupled cells, chronic drug design on a 16×16 tissue by implicit differentiation | `assets/attractor_landscape.png` (+ `_dark`) |
 | [`examples/tumor_reprogramming_demo.py`](examples/tumor_reprogramming_demo.py) | Voltage-level (CAM-type) tissue: optimized current stimulus I_ext(t, x, y) | `assets/inverse_reprogramming_result.png` (+ `_dark`) |
 
 ## Concepts
@@ -114,6 +119,7 @@ and published results:
 |---|---|
 | `test_ionic_physics.py` | Nernst and GHK voltage limits, pump stoichiometry and sign, mass and charge conservation in gap junctions, BETSE gap junction gating formula, grid = graph, gradients |
 | `zoo/test_cam2016.py` | Cervera et al. (2016): fixed points (−58.6, −15.5, −7.5 mV), Fig. 4 (normalization depends on coupling), Fig. 5 (channel over-expression blocks normalization) |
+| `test_attractors.py` | Exact sparse Jacobian (= dense autograd), two stable states and a saddle, fixed points of the simulation, implicit gradient = finite difference, hysteresis, mixed two-cell patterns, chronic drug design |
 | `test_interventions.py` | The tumor is a stable attractor; an optimized drug dose normalizes it permanently; an optimized light pattern targets the tumor |
 | `test_single_cell.py`, `test_tissue_domains.py`, `test_inverse_control.py` | Voltage-level model: bistability, domain walls, current-stimulus inverse control |
 
@@ -135,6 +141,10 @@ Present limitations, stated so that results are not over-read:
 - The CAM-type channels used for bistability are phenomenological, not models of one
   specific protein. The BETSE Kir2.1 model alone does not give bistability with the
   default profile.
+- The model has no cell volume or osmotic regulation, and the bath is fixed. A depolarized
+  steady state is reached within seconds, but over hours (slowest time scale about 3 h) its
+  cells gain Na⁺ (up to about 200 mM in the default cell). Steady states of depolarized
+  cells are therefore not physiological at long times; see `MATH_REFERENCE.md` §7.
 - Drug interventions are parameterized by blocked fraction, or by a user-supplied IC50
   and Hill coefficient. The library does not contain drug potency data.
 - BPTT cost grows with simulated time; long rollouts on large ion-level grids are slow on
@@ -144,7 +154,6 @@ Planned:
 
 - BEN (Manicka & Levin 2019) in the zoo. The equations in its Fig. 8 have inconsistent
   units and signs, so an exact reproduction needs confirmation from the authors.
-- Implicit differentiation through steady states (gradients of attractors without BPTT).
 - Higher-order stiff solvers, GPU benchmarks, Voronoi cell meshes from segmented images.
 - Gene regulatory network coupling (V_mem → expression → channels).
 - Fitting model parameters to voltage-dye (DiBAC, CC2-DMPE) images.

@@ -166,3 +166,60 @@ with a per-cell Jacobian is available as `method="rosenbrock"`.
 - Monovalent ions, no pumps: $V_{mem}$ converges to the GHK voltage equation (0.2 mV).
 - Gap junction transport conserves every ion species (relative error $< 10^{-12}$).
 - Grid and graph topologies give identical right-hand sides.
+
+## 7. Attractors and implicit differentiation (`bioelectrics.attractors`)
+
+### Steady states by pseudo-transient continuation
+
+A steady state solves $f(x^*, \theta) = 0$ for the packed state $x$ (concentrations
+and gates of all cells). The solver repeats implicit Euler steps
+
+$$\left(\tfrac{1}{h} I - J(x_k)\right)\Delta x = f(x_k), \qquad x_{k+1} = x_k + \Delta x,$$
+
+with $h$ multiplied by 3 after each accepted step and divided by 4 after a rejected
+one (a step is rejected when $V_{mem}$ changes by more than 10 mV in any cell). For
+small $h$ the iteration follows the dynamics, so it stays in the basin of the start
+state. For $h \to \infty$ it is Newton's method (quadratic convergence). Convergence:
+$h \ge 10^8$ s and $|\Delta x| \le 10^{-10}$ mol/m³ (concentrations) and $10^{-8}$ (gates).
+Components with $\partial f / \partial x \equiv 0$ in their row (impermeant species)
+are held fixed.
+
+$J$ is exact: forward-mode autograd with a distance-2 coloring of the cell graph.
+Cells of one color have disjoint closed neighbourhoods, so one Jacobian-vector product
+per (color, component) gives all their columns. A 4-neighbour grid needs 5 colors
+($(r + 2c) \bmod 5$), so $J$ costs $5n$ products for any grid size ($n$ = components
+per cell); all products run in one batched call.
+
+Stability: all eigenvalues of $J$ (restricted to the changing components) have
+negative real parts. The slowest time scale is $1/\min|\mathrm{Re}\,\lambda|$.
+
+### Implicit function theorem
+
+At $f(x^*(\theta), \theta) = 0$: $\; \frac{dx^*}{d\theta} = -J^{-1} \frac{\partial f}{\partial \theta}$.
+For a loss $L(x^*)$ the solver computes the adjoint $J^\top \lambda = \partial L / \partial x^*$
+(one sparse LU solve, SuperLU) and $\frac{dL}{d\theta} = -\lambda^\top \frac{\partial f}{\partial \theta}$
+(one vector-Jacobian product of the right-hand side). Memory and time do not depend
+on how long the tissue takes to relax. The gradient is the derivative of the attractor
+on the current side of any basin boundary.
+
+### Results for the default bistable cell (K_ir(CAM) and Cat_dep(CAM), $10^{-16}$ m²/s each)
+
+| Steady state | $V^*$ | Na⁺ in | K⁺ in | Stability | Slowest time scale |
+|---|---|---|---|---|---|
+| polarized | −77.3 mV | 13.7 mM | 129 mM | stable | 1.1 h |
+| saddle | −55.3 mV | 76.7 mM | 76.5 mM | unstable ($\lambda_{max} = 14.4$ s⁻¹) | — |
+| depolarized | −12.3 mV | 204 mM | 22 mM | stable | 2.8 h |
+
+The depolarized state is $-3$ mV within seconds. Over hours it drifts to the values
+above, because the model has no cell volume or osmotic regulation and the bath is
+fixed. The polarized state stays physiological. Interpret depolarized steady states
+over hours with this limitation in mind.
+
+### Validation (tests/test_attractors.py)
+
+- Colored sparse Jacobian equals the dense autograd Jacobian (grid and graph, rel. $10^{-12}$).
+- Single cell: two stable states and one saddle; stable states do not move in a 1 s
+  simulation (< 1 µV); a 2 mV perturbation of the saddle grows to > 10 mV.
+- Implicit gradient equals the central finite difference (relative error $< 10^{-4}$;
+  measured $1.4\times10^{-7}$ on a 6×6 tissue).
+- A dose ramp of a depolarizing-channel blocker shows hysteresis (pattern memory).
