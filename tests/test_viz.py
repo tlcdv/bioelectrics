@@ -53,3 +53,20 @@ def test_ionic_plots(tmp_path):
     plot_field_map(c, torch.rand(6, 6))
     fig.savefig(tmp_path / "ionic.png")
     plt.close(fig)
+
+
+def test_theme_switch_restores_and_colors_axes(tmp_path):
+    import matplotlib
+
+    from bioelectrics.viz import CONSOLE, IVORY, theme, theme_context
+
+    assert theme() is IVORY
+    with theme_context("console") as t:
+        assert t is CONSOLE and theme() is CONSOLE
+        fig, ax = plt.subplots()
+        plot_iv_curve(ax)
+        assert matplotlib.colors.to_hex(ax.get_facecolor()) == CONSOLE.panel
+        fig.savefig(tmp_path / "dark.png")
+        plt.close(fig)
+    assert theme() is IVORY
+    assert matplotlib.rcParams["figure.facecolor"] == IVORY.surface

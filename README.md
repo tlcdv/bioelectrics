@@ -13,7 +13,10 @@ The library builds on the work of Michael Levin's lab, Alexis Pietak (BETSE), an
 Javier Cervera and Salvador Mafe. See [Related tools](#related-tools) for what it
 takes from them and what it adds.
 
-![Inverse design of interventions on an ion-level tissue](assets/ionic_tumor_normalization.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/ionic_tumor_normalization_dark.png">
+  <img alt="Inverse design of interventions on an ion-level tissue" src="assets/ionic_tumor_normalization.png">
+</picture>
 
 *(A) An ion-level cell (GHK fluxes, pumps, a K⁺ inward rectifier and a depolarizing cation
 channel) has two attractors. (B) A depolarized "tumor" domain is isolated by closed
@@ -83,7 +86,7 @@ print(opt.optimize(n_iters=30, tol_mV=1.0).protocol.to_markdown())
 | Script | What it shows | Output |
 |---|---|---|
 | [`examples/ionic_tumor_normalization.py`](examples/ionic_tumor_normalization.py) | Ion-level tissue: optimized drug dose and optimized optogenetic light pattern | `assets/ionic_tumor_normalization.png`, `assets/ionic_protocols.md` |
-| [`examples/tumor_reprogramming_demo.py`](examples/tumor_reprogramming_demo.py) | Voltage-level (CAM-type) tissue: optimized current stimulus I_ext(t, x, y) | `assets/inverse_reprogramming_result.png` |
+| [`examples/tumor_reprogramming_demo.py`](examples/tumor_reprogramming_demo.py) | Voltage-level (CAM-type) tissue: optimized current stimulus I_ext(t, x, y) | `assets/inverse_reprogramming_result.png` (+ `_dark`) |
 
 ## Concepts
 

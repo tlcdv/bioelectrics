@@ -8,16 +8,17 @@
    healthy attractor and the gap junctions re-open.
 
 Run:  python examples/tumor_reprogramming_demo.py
-Output: assets/inverse_reprogramming_result.png
+Output: assets/inverse_reprogramming_result.png (ivory), assets/inverse_reprogramming_result_dark.png (console)
 """
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import torch
 
 from bioelectrics import ChannelProfile, GapJunctionProfile, Tissue, find_fixed_points, tumor_prepattern
 from bioelectrics.control import PatternOptimizer
-from bioelectrics.viz import make_reprogramming_figure
+from bioelectrics.viz import make_reprogramming_figure, theme_context
 
 GRID, PATCH = 32, 10
 T_STIM, T_RELAX, DT = 0.1, 0.5, 5e-4
@@ -51,10 +52,14 @@ def main() -> None:
     print(f"error reduction    : {100 * result.error_reduction:8.2f} %")
     print(f"max tumor V(T_relax): {result.v_final[0][mask].max().item() * 1e3:.2f} mV")
 
-    out = Path(__file__).resolve().parent.parent / "assets" / "inverse_reprogramming_result.png"
-    out.parent.mkdir(exist_ok=True)
-    make_reprogramming_figure(profile, gap_junctions, initial.v[0], result, T_STIM, T_RELAX, str(out))
-    print(f"saved figure       : {out}")
+    assets = Path(__file__).resolve().parent.parent / "assets"
+    assets.mkdir(exist_ok=True)
+    for name, suffix in (("ivory", ""), ("console", "_dark")):
+        out = assets / f"inverse_reprogramming_result{suffix}.png"
+        with theme_context(name):
+            fig = make_reprogramming_figure(profile, gap_junctions, initial.v[0], result, T_STIM, T_RELAX, str(out))
+            plt.close(fig)
+        print(f"saved figure       : {out}")
 
 
 if __name__ == "__main__":

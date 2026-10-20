@@ -14,7 +14,8 @@ Light protocol: cells express an anion channelrhodopsin (light-gated Cl- channel
    pattern, shown for 0.1 s, normalizes the tissue with the least light?
 
 Run:    python examples/ionic_tumor_normalization.py
-Output: assets/ionic_tumor_normalization.png, assets/ionic_protocols.md
+Output: assets/ionic_tumor_normalization.png (ivory theme),
+        assets/ionic_tumor_normalization_dark.png (console theme), assets/ionic_protocols.md
 """
 
 from pathlib import Path
@@ -26,16 +27,14 @@ from bioelectrics.constants import DTYPE
 from bioelectrics.interventions import ChannelBlocker, InterventionOptimizer, Optogenetic
 from bioelectrics.ionic import CAT_DEP_CAM, K_IR_CAM, ChannelExpression, IonicState, IonicTissue, Modifiers, leak
 from bioelectrics.viz import (
-    INK,
-    INK_2,
-    MUTED,
-    SERIES,
-    SURFACE,
     _panel_label,
     _style,
     plot_field_map,
     plot_ionic_iv,
     plot_ionic_vmem_map,
+    style_colorbar,
+    theme,
+    theme_context,
 )
 
 N = 16
@@ -94,78 +93,86 @@ def main() -> None:
     t_drug = [t for t in times if t <= T_STIM] + [t for t in times if t > T_STIM - 1e-12]
     v_drug = list(vm(tr_on)) + list(vm(tr_off))
 
-    # Figure.
-    fig = plt.figure(figsize=(14.5, 8.6), facecolor=SURFACE)
-    gs = fig.add_gridspec(2, 3, hspace=0.45, wspace=0.62)
-
-    ax = fig.add_subplot(gs[0, 0])
-    single = IonicTissue(edges=torch.zeros(2, 0, dtype=torch.long), channels=tissue.channels[:2])
-    plot_ionic_iv(ax, single)
-    ax.set_title("Ion-level cell: two attractors", fontsize=10, loc="left", color=INK)
-    _panel_label(ax, "A")
-
-    ax = fig.add_subplot(gs[0, 1])
-    im, n_closed = plot_ionic_vmem_map(ax, v_init, v_center_mV=-37.0)
-    ax.set_title(f"Tumor domain, {n_closed} closed\ngap junctions (black)", fontsize=10, loc="left", color=INK)
-    _panel_label(ax, "B")
-    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cb.set_label("V_mem (mV)", color=INK_2, fontsize=8)
-    cb.ax.tick_params(labelsize=7, colors=MUTED, labelcolor=INK_2)
-
-    ax = fig.add_subplot(gs[0, 2])
-    ax.axvspan(0, 1e3 * T_STIM, color="#f0efec", zorder=0)
-    ax.plot([1e3 * t for t in times], vm(tr_ctrl), color=MUTED, lw=1.8, label="no drug")
-    ax.plot([1e3 * t for t in t_drug], v_drug, color=SERIES[0], lw=2.2, label="drug for 0.1 s")
-    ax.axhline(-37.0, color=MUTED, lw=0.8, ls=":")
-    ax.text(1e3 * T_RELAX, -35.5, "threshold", ha="right", fontsize=7, color=INK_2)
-    ax.set_xlabel("Time (ms)")
-    ax.set_ylabel("V_mem of a tumor cell (mV)")
-    blocked = res_a.protocol.steps[0]["value"]
-    ax.set_title(f"Drug protocol: {100 * blocked:.0f}% block\nfor 0.1 s, then washout", fontsize=10, loc="left", color=INK)
-    ax.legend(frameon=False, fontsize=7, labelcolor=INK_2, loc="center right")
-    ax.grid(True, color="#e1e0d9", lw=0.5)
-    _style(ax)
-    _panel_label(ax, "C")
-
-    ax = fig.add_subplot(gs[1, 0])
-    im = plot_field_map(ax, light.field().detach())
-    ax.contour(mask.numpy().astype(float), levels=[0.5], colors=INK, linewidths=1.0)
-    ax.set_title("Light protocol: optimized\npattern (outline = tumor)", fontsize=10, loc="left", color=INK)
-    _panel_label(ax, "D")
-    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cb.set_label("opsin open probability", color=INK_2, fontsize=8)
-    cb.ax.tick_params(labelsize=7, colors=MUTED, labelcolor=INK_2)
-
-    ax = fig.add_subplot(gs[1, 1])
-    im, n_closed = plot_ionic_vmem_map(ax, res_b.v_final[0], v_center_mV=-37.0)
-    ax.set_title(f"After light is off (t = {1e3 * T_RELAX:.0f} ms)\n{n_closed} closed gap junctions",
-                 fontsize=10, loc="left", color=INK)
-    _panel_label(ax, "E")
-    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cb.set_label("V_mem (mV)", color=INK_2, fontsize=8)
-    cb.ax.tick_params(labelsize=7, colors=MUTED, labelcolor=INK_2)
-
-    ax = fig.add_subplot(gs[1, 2])
-    ax.plot(range(1, len(res_a.error_history_mV) + 1), res_a.error_history_mV, color=SERIES[0], lw=2,
-            marker="o", ms=4, label="drug protocol")
-    ax.plot(range(1, len(res_b.error_history_mV) + 1), res_b.error_history_mV, color=SERIES[1], lw=2,
-            marker="o", ms=4, label="light protocol")
-    ax.set_yscale("log")
-    ax.set_xlabel("Adam iteration")
-    ax.set_ylabel("RMS pattern error at T_relax (mV)")
-    ax.legend(frameon=False, fontsize=7, labelcolor=INK_2)
-    ax.grid(True, color="#e1e0d9", lw=0.5)
-    ax.set_title("Backpropagation through the\nion-level simulation", fontsize=10, loc="left", color=INK)
-    _style(ax)
-    _panel_label(ax, "F")
-
     ASSETS.mkdir(exist_ok=True)
-    fig.savefig(ASSETS / "ionic_tumor_normalization.png", dpi=180, bbox_inches="tight", facecolor=SURFACE)
+    data = dict(tissue=tissue, mask=mask, v_init=v_init, times=times, t_drug=t_drug, v_drug=v_drug,
+                v_ctrl=vm(tr_ctrl), res_a=res_a, res_b=res_b, light=light)
+    for name, suffix in (("ivory", ""), ("console", "_dark")):
+        with theme_context(name):
+            fig = make_figure(**data)
+            fig.savefig(ASSETS / f"ionic_tumor_normalization{suffix}.png", dpi=180, bbox_inches="tight")
+            plt.close(fig)
     report = "# Optimized protocols\n\n## Drug protocol (bath-applied blocker)\n\n" + res_a.protocol.to_markdown()
     report += "\n\n## Light protocol (anion channelrhodopsin)\n\n" + res_b.protocol.to_markdown() + "\n"
     (ASSETS / "ionic_protocols.md").write_text(report, encoding="utf-8")
     print(report)
     print(f"light in tumor (mean): {light.field()[mask].mean():.3f}, outside: {light.field()[~mask].mean():.4f}")
+
+
+def make_figure(tissue, mask, v_init, times, t_drug, v_drug, v_ctrl, res_a, res_b, light):
+    """Six-panel summary figure in the active theme."""
+    t = theme()
+    fig = plt.figure(figsize=(14.5, 8.6))
+    gs = fig.add_gridspec(2, 3, hspace=0.45, wspace=0.62)
+
+    ax = fig.add_subplot(gs[0, 0])
+    single = IonicTissue(edges=torch.zeros(2, 0, dtype=torch.long), channels=tissue.channels[:2])
+    plot_ionic_iv(ax, single)
+    ax.set_title("Ion-level cell: two attractors", fontsize=10, loc="left", color=t.ink)
+    _panel_label(ax, "A")
+
+    ax = fig.add_subplot(gs[0, 1])
+    im, n_closed = plot_ionic_vmem_map(ax, v_init, v_center_mV=-37.0)
+    ax.set_title(f"Tumor domain, {n_closed} closed\ngap junctions (lines)", fontsize=10, loc="left", color=t.ink)
+    _panel_label(ax, "B")
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    style_colorbar(cb, "V_mem (mV)")
+
+    ax = fig.add_subplot(gs[0, 2])
+    ax.axvspan(0, 1e3 * T_STIM, color=t.shade, zorder=0)
+    ax.plot([1e3 * t for t in times], v_ctrl, color=t.muted, lw=1.8, label="no drug")
+    ax.plot([1e3 * t for t in t_drug], v_drug, color=t.series[0], lw=2.2, label="drug for 0.1 s")
+    ax.axhline(-37.0, color=t.muted, lw=0.8, ls=":")
+    ax.text(1e3 * T_RELAX, -35.5, "threshold", ha="right", fontsize=7, color=t.ink_2)
+    ax.set_xlabel("Time (ms)")
+    ax.set_ylabel("V_mem of a tumor cell (mV)")
+    blocked = res_a.protocol.steps[0]["value"]
+    ax.set_title(f"Drug protocol: {100 * blocked:.0f}% block\nfor 0.1 s, then washout", fontsize=10, loc="left", color=t.ink)
+    ax.legend(frameon=False, fontsize=7, labelcolor=t.ink_2, loc="center right")
+    ax.grid(True, color=t.grid, lw=0.5)
+    _style(ax)
+    _panel_label(ax, "C")
+
+    ax = fig.add_subplot(gs[1, 0])
+    im = plot_field_map(ax, light.field().detach())
+    ax.contour(mask.numpy().astype(float), levels=[0.5], colors=t.ink, linewidths=1.0)
+    ax.set_title("Light protocol: optimized\npattern (outline = tumor)", fontsize=10, loc="left", color=t.ink)
+    _panel_label(ax, "D")
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    style_colorbar(cb, "opsin open probability")
+
+    ax = fig.add_subplot(gs[1, 1])
+    im, n_closed = plot_ionic_vmem_map(ax, res_b.v_final[0], v_center_mV=-37.0)
+    ax.set_title(f"After light is off (t = {1e3 * T_RELAX:.0f} ms)\n{n_closed} closed gap junctions",
+                 fontsize=10, loc="left", color=t.ink)
+    _panel_label(ax, "E")
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    style_colorbar(cb, "V_mem (mV)")
+
+    ax = fig.add_subplot(gs[1, 2])
+    ax.plot(range(1, len(res_a.error_history_mV) + 1), res_a.error_history_mV, color=t.series[0], lw=2,
+            marker="o", ms=4, label="drug protocol")
+    ax.plot(range(1, len(res_b.error_history_mV) + 1), res_b.error_history_mV, color=t.series[1], lw=2,
+            marker="o", ms=4, label="light protocol")
+    ax.set_yscale("log")
+    ax.set_xlabel("Adam iteration")
+    ax.set_ylabel("RMS pattern error at T_relax (mV)")
+    ax.legend(frameon=False, fontsize=7, labelcolor=t.ink_2)
+    ax.grid(True, color=t.grid, lw=0.5)
+    ax.set_title("Backpropagation through the\nion-level simulation", fontsize=10, loc="left", color=t.ink)
+    _style(ax)
+    _panel_label(ax, "F")
+
+    return fig
 
 
 if __name__ == "__main__":
