@@ -1,0 +1,106 @@
+# Mathematical Reference
+
+All internal math uses SI units: Volts, Amperes, Seconds, Farads, Siemens.
+
+## 1. Physical constants
+
+| Symbol | Value | Unit |
+|---|---|---|
+| $F$ (Faraday constant) | 96485.332 | C/mol |
+| $R$ (gas constant) | 8.31446 | J/(mol K) |
+| $T$ (physiological temperature) | 310.15 | K |
+| $V_T = RT/F$ (thermal voltage) | 0.026727 | V |
+
+BETSE uses $F = 96485$, $R = 8.314$ (`betse/science/parameters.py`, lines 1106–1107) and
+$T = 310\text{ K}$ (`betse/data/yaml/sim_config.yaml`, key `temperature`). This library uses
+the CODATA values above.
+
+## 2. Single-cell current balance (Cervera–Alcaraz–Mafe model)
+
+$$C_m \frac{dV_i}{dt} = -I_{pol}(V_i) - I_{dep}(V_i) - I_{leak}(V_i) + \sum_{j \in N(i)} G_{ij}(V_i - V_j) \cdot (V_j - V_i) + I_{ext, i}(t)$$
+
+$I_{ext}$ is positive when it depolarizes the cell (inward positive charge).
+
+### Outward hyperpolarizing current (potassium-like, $E_{pol} = -0.080\text{ V}$)
+
+$$I_{pol}(V) = \frac{G_{pol}^0 (V - E_{pol})}{1 + \exp\left(\frac{z (V - V_{th, pol})}{V_T}\right)}$$
+
+### Inward depolarizing current (sodium/calcium-like, $E_{dep} = 0.0\text{ V}$)
+
+$$I_{dep}(V) = \frac{G_{dep}^0 (V - E_{dep})}{1 + \exp\left(\frac{-z (V - V_{th, dep})}{V_T}\right)}$$
+
+### Leak current
+
+$$I_{leak}(V) = G_{leak} (V - E_{leak})$$
+
+The default is $G_{leak} = 0$. The leak is available for model extensions.
+
+### Fixed points
+
+A fixed point $V^*$ satisfies $I_{pol}(V^*) + I_{dep}(V^*) + I_{leak}(V^*) = 0$.
+It is stable when $dI_{ion}/dV > 0$ at $V^*$, and unstable when $dI_{ion}/dV < 0$.
+
+With equal thresholds ($V_{th,pol} = V_{th,dep}$), the ratio $G_{dep}(V)/G_{pol}(V)$ is a
+pure exponential in $V$. Then the cell has only one stable point. Two different
+thresholds make the ratio steeper in the middle of the voltage range. This gives three
+fixed points (bistability).
+
+### Default `ChannelProfile` (calibrated by bounded Nelder–Mead fit)
+
+| Parameter | Value |
+|---|---|
+| $C_m$ | 10 pF ($1.0 \times 10^{-11}$ F) |
+| $G_{pol}^0$ | 1.0 nS |
+| $G_{dep}^0$ | 1.7645 nS |
+| $z$ | 2.1134 |
+| $V_{th,pol}$ | −20.96 mV |
+| $V_{th,dep}$ | −39.00 mV |
+| $G_{leak}$ | 0 |
+
+Resulting fixed points: −70.0 mV (stable, polarized), −45.0 mV (unstable saddle),
+−20.0 mV (stable, depolarized). The membrane time constant is about
+$C_m / G \approx 10\text{ ms}$.
+
+## 3. Voltage-gated gap junctions
+
+Transjunctional voltage: $V_{ij} = V_i - V_j$.
+
+$$G_{ij}(V_{ij}) = G_{min} + \frac{G_{max} - G_{min}}{1 + \exp\left(\frac{\vert V_{ij}\vert - V_0}{V_{width}}\right)}$$
+
+The conductance is bell-shaped in $V_{ij}$. It is near $G_{max}$ for $\vert V_{ij} \vert \ll V_0$
+and near $G_{min}$ for $\vert V_{ij} \vert \gg V_0$.
+
+Default values: $G_{max} = 1.0\text{ nS}$, $G_{min} = 0.02\text{ nS}$,
+$V_0 = 0.020\text{ V}$, $V_{width} = 0.004\text{ V}$.
+
+### Comparison with BETSE
+
+BETSE (`betse/science/channels/gap_junction.py`, lines 98–99) uses a double-Boltzmann
+open fraction:
+
+$$g_{open} = g_{min} + \frac{1}{1 + e^{(V_{gj} - V_{th})/w}} - \frac{1}{1 + e^{(V_{gj} + V_{th})/w}}$$
+
+with $V_{th} = 15\text{ mV}$, $w = 15\text{ mV}$, $g_{min} = 0.10$
+(`sim_config.yaml`, keys `gj voltage threshold`, `gj voltage window`, `gj minimum`).
+This library uses the single-Boltzmann form in $\vert V_{ij} \vert$ above. Both forms are
+symmetric in $V_{ij}$ and close at high transjunctional voltage.
+
+## 4. Goldman–Hodgkin–Katz (GHK) electrodiffusion
+
+BETSE `electroflux` (`betse/science/sim_toolbox.py`, line 18) computes the molar flux
+from outside (A) to inside (B):
+
+$$\alpha = \frac{z F V}{R T}, \qquad
+J = -\frac{D \alpha}{d} \cdot \frac{c_{in} - c_{out} e^{-\alpha}}{1 - e^{-\alpha}}$$
+
+The GHK current density for one ion species with permeability $P = D/d$ is
+
+$$I_{GHK} = P z^2 \frac{F^2 V}{R T} \cdot \frac{c_{in} - c_{out} e^{-\alpha}}{1 - e^{-\alpha}}$$
+
+(outward positive). `channels.ghk_current` implements this primitive.
+
+## 5. Numerical integration
+
+Fixed-step RK4 with $dt = 0.5\text{ ms}$ ($\tau / dt \approx 20$). The loop runs over time
+steps only. Each step is vectorized over all cells and the batch dimension. The
+complete trajectory is differentiable (backpropagation through time).
