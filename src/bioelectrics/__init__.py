@@ -11,6 +11,8 @@ from .channels import (
     ionic_current,
     membrane_rhs,
 )
+from .gap_junctions import GapJunctionProfile, gj_conductance, grid_conductances
 from .integrators import euler_step, integrate, rk4_step
+from .tissue import BioelectricState, Tissue, tumor_prepattern
 
 __version__ = "0.1.0"
