@@ -94,9 +94,7 @@ class PatternOptimizer:
         self.stim_end_weight = stim_end_weight
         self.v_scale = v_scale
         self.u = torch.zeros((n_time_bins, *v_initial.shape), dtype=DTYPE, requires_grad=True)
-        # eps is far below the default because BPTT through a contracting attractor
-        # gives very small (but correctly signed) gradients.
-        self.optimizer = torch.optim.Adam([self.u], lr=lr, eps=1e-30)
+        self.optimizer = torch.optim.Adam([self.u], lr=lr)
 
     # ------------------------------------------------------------------ rollout
     @property
@@ -137,6 +135,19 @@ class PatternOptimizer:
         return err + self.stim_penalty * torch.mean(self.u**2)
 
     # ------------------------------------------------------------- optimization
+    def _normalize_gradient(self) -> None:
+        """Divide the stimulus gradient by its largest absolute entry.
+
+        BPTT through a contracting attractor gives very small gradients (they decay
+        about as exp(-(T_relax - T_stim) / tau)). Global normalization keeps the
+        direction and the relative size of all entries. Cells with relatively tiny
+        gradients then receive almost no stimulus, so the trigger stays local.
+        """
+        g = self.u.grad
+        scale = g.abs().max()
+        if scale > 0:
+            g.div_(scale)
+
     def optimize(self, n_iters: int = 50, tol: float | None = None, verbose: bool = False) -> OptimizationResult:
         """Run Adam for ``n_iters`` iterations. Stop early if RMS error < ``tol`` [V]."""
         with torch.no_grad():
@@ -148,6 +159,7 @@ class PatternOptimizer:
             v_stim_end, v_final = self.rollout()
             loss = self.loss(v_stim_end, v_final)
             loss.backward()
+            self._normalize_gradient()
             self.optimizer.step()
             err = self.pattern_error(v_final).item()
             result.loss_history.append(loss.item())

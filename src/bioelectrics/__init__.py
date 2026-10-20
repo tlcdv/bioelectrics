@@ -15,5 +15,6 @@ from .gap_junctions import GapJunctionProfile, gj_conductance, grid_conductances
 from .integrators import euler_step, integrate, rk4_step
 from .tissue import BioelectricState, Tissue, tumor_prepattern
 from .control import OptimizationResult, PatternOptimizer
+from .gap_junctions import GapJunctionProfile
 
 __version__ = "0.1.0"
