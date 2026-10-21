@@ -223,3 +223,45 @@ over hours with this limitation in mind.
 - Implicit gradient equals the central finite difference (relative error $< 10^{-4}$;
   measured $1.4\times10^{-7}$ on a 6×6 tissue).
 - A dose ramp of a depolarizing-channel blocker shows hysteresis (pattern memory).
+
+## 8. Drug dose response (`bioelectrics.pharmacology`)
+
+A drug at concentration $c$ blocks a fraction of its target following the Hill equation
+
+$$ f_{block}(c) = \frac{1}{1 + (IC_{50}/c)^{n_H}}, $$
+
+which is applied as a multiplier on the target: `channel_scale[name]`, `nak_scale` or
+`gj_scale` is multiplied by $1 - f_{block}$. The optimized variable is the concentration,
+bounded in $[0, 100\,IC_{50}]$ by the sigmoid reparametrization, which spans about 0.06 % to
+99 % block.
+
+Concentrations are in mol/m³, which equals millimolar, matching the SI convention used
+everywhere else. Sources report µM or nM; the conversion is applied once, in the library,
+and the figure as printed in the source is kept beside it.
+
+### What is in the library
+
+10 values from 4 primary sources, covering 4 targets: HCN (ivabradine, cilobradine,
+zatebradine), Kir2.1 (chloroquine), the Na/K-ATPase (ouabain), and Cx43 gap junctions
+(carbenoxolone, meclofenamic acid, heptanol, digoxin, phorbol 12,13-dibutyrate). Each entry
+records the assay, the species and the citation. No value was estimated or interpolated.
+
+### What is deliberately absent, and why
+
+- **Dihydropyridines (nifedipine and similar) on Cav1.2.** Their block is state-dependent, so
+  the IC₅₀ depends on the holding potential and differs by orders of magnitude between a
+  hyperpolarized and a depolarized cell. A single number is therefore wrong in a tissue whose
+  cells sit at different voltages, which is the case this library models.
+- **Lamotrigine on HCN2.** No published EC₅₀ on the channel was found. The Pai et al. (2020)
+  paper reports organism-level outcomes, not a channel potency.
+- **KATP compounds.** The channel is not yet in the channel library.
+
+### Limits that apply to every entry
+
+Hill coefficients are mostly unpublished; where none is given, 1 is used and the entry says
+so. Potency is species-dependent, most sharply for ouabain, where rodent α1 is far less
+sensitive than human α1. The Cx43 values come from a dye-transfer assay, which measures
+permeability to calcein rather than electrical coupling; these are different measurements.
+Digoxin blocks the Na/K-ATPase about 10³ times more potently than Cx43, so at a
+junction-blocking concentration the pump is blocked too, and only one of the two effects is
+modelled.

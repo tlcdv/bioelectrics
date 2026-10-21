@@ -9,11 +9,13 @@ Subpackages and modules
   ``ChronicInterventionOptimizer``).
 * ``bioelectrics.attractors``: steady states, stability, basins, dose ramps, and
   implicit gradients of steady states.
+* ``bioelectrics.pharmacology``: drugs with published potency values, each carrying its
+  assay, species and citation.
 * ``bioelectrics.zoo``: published models with reproduction tests.
 * Voltage-level (CAM-type) models: ``ChannelProfile``, ``Tissue``, ``PatternOptimizer``.
 """
 
-from . import attractors, constants, interventions, ionic, zoo
+from . import attractors, constants, interventions, ionic, pharmacology, zoo
 from .channels import (
     ChannelProfile,
     find_fixed_points,

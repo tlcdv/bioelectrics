@@ -119,62 +119,75 @@ class ChannelMisexpression(Intervention):
         mods.channel_add[self.target] = mods.channel_add.get(self.target, 0.0) + self.field()
 
 
-class ChannelBlocker(Intervention):
-    """Block a channel type (drug). Value: blocked fraction in ``[0, max_block]``.
+class _Blocker(Intervention):
+    """Base for the three blockers. The optimized value is a fraction or a dose.
 
-    With ``ic50`` set, the value is a dose (same unit as ``ic50``) and the blocked
-    fraction follows the Hill equation ``1 / (1 + (ic50 / dose)^hill)``.
+    Without ``ic50`` the value is the blocked fraction directly, in
+    ``[0, max_block]``. With ``ic50`` the value is a concentration in the same
+    unit as ``ic50``, and the blocked fraction follows the Hill equation
+    ``1 / (1 + (ic50 / dose)^hill)``. Subclasses implement :meth:`apply`.
     """
+
+    def __init__(self, target: str, region, max_block: float, ic50: float | None, hill: float,
+                 max_dose: float | None, init: float | None, spatial: bool, cost: float):
+        self.ic50, self.hill = ic50, hill
+        if ic50 is None:
+            self.unit = "fraction blocked"
+            super().__init__(target, region, 0.0, max_block, init if init is not None else 0.1, spatial, cost)
+        else:
+            self.unit = "dose"
+            hi = max_dose if max_dose is not None else 100.0 * ic50
+            super().__init__(target, region, 0.0, hi, init if init is not None else 0.1 * ic50, spatial, cost)
+
+    def blocked_fraction(self) -> torch.Tensor:
+        """The fraction of the target blocked, in ``[0, 1]``."""
+        f = self.field()
+        if self.ic50 is None:
+            return f
+        return 1.0 / (1.0 + (self.ic50 / f.clamp_min(1e-30)) ** self.hill)
+
+
+class ChannelBlocker(_Blocker):
+    """Block a channel type (drug). Value: blocked fraction, or a dose with ``ic50``."""
 
     kind = "channel blocker"
 
     def __init__(self, channel: str, region=None, max_block: float = 1.0, ic50: float | None = None,
                  hill: float = 1.0, max_dose: float | None = None, init: float | None = None,
                  spatial: bool = False, cost: float = 0.0):
-        self.ic50, self.hill = ic50, hill
-        if ic50 is None:
-            self.unit = "fraction blocked"
-            super().__init__(channel, region, 0.0, max_block, init if init is not None else 0.1, spatial, cost)
-        else:
-            self.unit = "dose"
-            hi = max_dose if max_dose is not None else 100.0 * ic50
-            super().__init__(channel, region, 0.0, hi, init if init is not None else 0.1 * ic50, spatial, cost)
-
-    def blocked_fraction(self) -> torch.Tensor:
-        f = self.field()
-        if self.ic50 is None:
-            return f
-        return 1.0 / (1.0 + (self.ic50 / f.clamp_min(1e-30)) ** self.hill)
+        super().__init__(channel, region, max_block, ic50, hill, max_dose, init, spatial, cost)
 
     def apply(self, mods: Modifiers) -> None:
         s = mods.channel_scale.get(self.target, 1.0)
         mods.channel_scale[self.target] = s * (1.0 - self.blocked_fraction())
 
 
-class PumpBlocker(Intervention):
-    """Block the Na/K-ATPase (ouabain-like). Value: blocked fraction."""
+class PumpBlocker(_Blocker):
+    """Block the Na/K-ATPase (ouabain-like). Value: blocked fraction, or a dose with ``ic50``."""
 
-    kind, unit = "Na/K-ATPase blocker", "fraction blocked"
+    kind = "Na/K-ATPase blocker"
 
-    def __init__(self, region=None, max_block: float = 1.0, init: float = 0.1, spatial: bool = False,
-                 cost: float = 0.0):
-        super().__init__("Na/K-ATPase", region, 0.0, max_block, init, spatial, cost)
-
-    def apply(self, mods: Modifiers) -> None:
-        mods.nak_scale = mods.nak_scale * (1.0 - self.field())
-
-
-class GapJunctionBlocker(Intervention):
-    """Block gap junctions (octanol/heptanol-like). Value: blocked fraction."""
-
-    kind, unit = "gap junction blocker", "fraction blocked"
-
-    def __init__(self, region=None, max_block: float = 1.0, init: float = 0.1, spatial: bool = False,
-                 cost: float = 0.0):
-        super().__init__("gap junctions", region, 0.0, max_block, init, spatial, cost)
+    def __init__(self, region=None, max_block: float = 1.0, ic50: float | None = None,
+                 hill: float = 1.0, max_dose: float | None = None, init: float | None = None,
+                 spatial: bool = False, cost: float = 0.0):
+        super().__init__("Na/K-ATPase", region, max_block, ic50, hill, max_dose, init, spatial, cost)
 
     def apply(self, mods: Modifiers) -> None:
-        mods.gj_scale = mods.gj_scale * (1.0 - self.field())
+        mods.nak_scale = mods.nak_scale * (1.0 - self.blocked_fraction())
+
+
+class GapJunctionBlocker(_Blocker):
+    """Block gap junctions (carbenoxolone-like). Value: blocked fraction, or a dose with ``ic50``."""
+
+    kind = "gap junction blocker"
+
+    def __init__(self, region=None, max_block: float = 1.0, ic50: float | None = None,
+                 hill: float = 1.0, max_dose: float | None = None, init: float | None = None,
+                 spatial: bool = False, cost: float = 0.0):
+        super().__init__("gap junctions", region, max_block, ic50, hill, max_dose, init, spatial, cost)
+
+    def apply(self, mods: Modifiers) -> None:
+        mods.gj_scale = mods.gj_scale * (1.0 - self.blocked_fraction())
 
 
 class Optogenetic(Intervention):

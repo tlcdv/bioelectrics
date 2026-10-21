@@ -47,6 +47,7 @@ The full protocol tables are in [`assets/ionic_protocols.md`](assets/ionic_proto
 | Differentiate a steady state with respect to any parameter (implicit function theorem, one sparse solve) | `bioelectrics.attractors.steady_state_implicit` |
 | Map the attractor landscape: all patterns from many start states, basins, dose ramps with hysteresis | `enumerate_attractors`, `basin_map`, `dose_response` |
 | Design chronic interventions (constant dose, stable misexpression) whose steady state is the target | `bioelectrics.interventions.ChronicInterventionOptimizer` |
+| Screen drugs with published potency values, each carrying its assay, species and citation | `bioelectrics.pharmacology` |
 | Run published models and their reproduction tests | `bioelectrics.zoo` |
 | Use the fast voltage-level (CAM) model for large tissues | `bioelectrics.Tissue`, `PatternOptimizer` |
 
@@ -90,6 +91,7 @@ print(opt.optimize(n_iters=30, tol_mV=1.0).protocol.to_markdown())
 | Script | What it shows | Output |
 |---|---|---|
 | [`examples/ionic_tumor_normalization.py`](examples/ionic_tumor_normalization.py) | Ion-level tissue: optimized drug dose and optimized optogenetic light pattern | `assets/ionic_tumor_normalization.png`, `assets/ionic_protocols.md` |
+| [`examples/drug_repurposing.py`](examples/drug_repurposing.py) | In-silico screen of the drug library against a depolarized domain, with the direction and size of each effect | `assets/drug_screen.png` (+ `_dark`), `assets/drug_screen.md` |
 | [`examples/attractor_landscape.py`](examples/attractor_landscape.py) | Hysteresis of a dose ramp, basins of two coupled cells, chronic drug design on a 16×16 tissue by implicit differentiation | `assets/attractor_landscape.png` (+ `_dark`) |
 | [`examples/tumor_reprogramming_demo.py`](examples/tumor_reprogramming_demo.py) | Voltage-level (CAM-type) tissue: optimized current stimulus I_ext(t, x, y) | `assets/inverse_reprogramming_result.png` (+ `_dark`) |
 
@@ -119,6 +121,7 @@ and published results:
 |---|---|
 | `test_ionic_physics.py` | Nernst and GHK voltage limits, pump stoichiometry and sign, mass and charge conservation in gap junctions, BETSE gap junction gating formula, grid = graph, gradients |
 | `zoo/test_cam2016.py` | Cervera et al. (2016): fixed points (−58.6, −15.5, −7.5 mV), Fig. 4 (normalization depends on coupling), Fig. 5 (channel over-expression blocks normalization) |
+| `test_pharmacology.py` | Every entry has a source, assay and species; each stored concentration matches the figure its source prints; every target exists; the Hill equation gives exactly 50 % at the published value; a pump or junction dose writes its own modifier field |
 | `test_attractors.py` | Exact sparse Jacobian (= dense autograd), two stable states and a saddle, fixed points of the simulation, implicit gradient = finite difference, hysteresis, mixed two-cell patterns, chronic drug design |
 | `test_interventions.py` | The tumor is a stable attractor; an optimized drug dose normalizes it permanently; an optimized light pattern targets the tumor |
 | `test_single_cell.py`, `test_tissue_domains.py`, `test_inverse_control.py` | Voltage-level model: bistability, domain walls, current-stimulus inverse control |
@@ -145,8 +148,19 @@ Present limitations, stated so that results are not over-read:
   steady state is reached within seconds, but over hours (slowest time scale about 3 h) its
   cells gain Na⁺ (up to about 200 mM in the default cell). Steady states of depolarized
   cells are therefore not physiological at long times; see `MATH_REFERENCE.md` §7.
-- Drug interventions are parameterized by blocked fraction, or by a user-supplied IC50
-  and Hill coefficient. The library does not contain drug potency data.
+- `bioelectrics.pharmacology` contains 10 potency values read from 4 primary sources. Each
+  carries its assay, species, regulatory status and citation. **None of them was estimated.**
+  Compounds considered and left out are listed in `pharmacology.EXCLUDED` with the reason;
+  dihydropyridines are excluded because their block is state-dependent, so one IC50 is wrong
+  in a tissue whose cells sit at different voltages.
+- The screen in `examples/drug_repurposing.py` finds that **no drug in that set normalizes a
+  depolarized domain.** Every compound with a verified value acts on a polarizing element
+  (the inward rectifier, the Na/K-ATPase), so blocking it depolarizes. This is a statement
+  about which potency data are published, not about bioelectric medicine. The depolarizing
+  channel in the model is also phenomenological rather than a named protein, so no real drug
+  targets it by construction.
+- Potency values are in-silico inputs, not predictions of a clinical effect. Off-target
+  actions are recorded but not modelled.
 - BPTT cost grows with simulated time; long rollouts on large ion-level grids are slow on
   a CPU (an 8×8 tissue: about 4 s per optimization iteration for a 0.5 s rollout).
 
