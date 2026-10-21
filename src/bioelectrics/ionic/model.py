@@ -37,18 +37,27 @@ from .transport import betse_gj_open_fraction, ca_atpase_influx, ghk_influx, nak
 
 @dataclass
 class CellGeometry:
-    """Membrane area [m^2] and cytoplasm volume [m^3] of one cell."""
+    """Membrane area [m^2] and cytoplasm volume [m^3] of one cell.
+
+    Only ``area`` and ``volume`` enter the physics. ``radius`` and ``height`` are
+    kept when a constructor was given them, so a shape read from another tool's
+    configuration can be written back out unchanged; they are ``None`` when the
+    area and volume were given directly.
+    """
 
     area: float
     volume: float
+    radius: float | None = None
+    height: float | None = None
 
     @classmethod
     def sphere(cls, radius: float = 5.0e-6) -> "CellGeometry":
-        return cls(4.0 * math.pi * radius**2, 4.0 / 3.0 * math.pi * radius**3)
+        return cls(4.0 * math.pi * radius**2, 4.0 / 3.0 * math.pi * radius**3, radius=radius)
 
     @classmethod
     def cylinder(cls, radius: float = 5.0e-6, height: float = 10.0e-6) -> "CellGeometry":
-        return cls(2.0 * math.pi * radius * (radius + height), math.pi * radius**2 * height)
+        return cls(2.0 * math.pi * radius * (radius + height), math.pi * radius**2 * height,
+                   radius=radius, height=height)
 
 
 @dataclass

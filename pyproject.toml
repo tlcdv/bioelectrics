@@ -43,7 +43,7 @@ Issues = "https://github.com/tlcdv/bioelectrics/issues"
 Validation = "https://tlcdv.github.io/bioelectrics/validation/"
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-cov>=4"]
+dev = ["pytest>=7", "pytest-cov>=4", "pyyaml>=6"]
 notebooks = ["nbmake>=1.5", "matplotlib"]
 
 [tool.setuptools.packages.find]
