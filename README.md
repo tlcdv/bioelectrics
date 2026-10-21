@@ -7,6 +7,8 @@
 [![Tests](https://github.com/tlcdv/bioelectrics/actions/workflows/tests.yml/badge.svg)](https://github.com/tlcdv/bioelectrics/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+<img width="1000" alt="bioelectrics, a differentiable engine for somatic bioelectricity" src="https://raw.githubusercontent.com/tlcdv/bioelectrics/main/assets/banner.png" />
+
 Documentation: <https://tlcdv.github.io/bioelectrics/> — with
 [four runnable tutorials](https://tlcdv.github.io/bioelectrics/tutorials/) that open in
 Colab with no installation — including a
@@ -26,8 +28,8 @@ Javier Cervera and Salvador Mafe. See [Related tools](#related-tools) for what i
 takes from them and what it adds.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/ionic_tumor_normalization_dark.png">
-  <img alt="Inverse design of interventions on an ion-level tissue" src="assets/ionic_tumor_normalization.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tlcdv/bioelectrics/main/assets/ionic_tumor_normalization_dark.png">
+  <img alt="Inverse design of interventions on an ion-level tissue" src="https://raw.githubusercontent.com/tlcdv/bioelectrics/main/assets/ionic_tumor_normalization.png">
 </picture>
 
 *(A) An ion-level cell (GHK fluxes, pumps, a K⁺ inward rectifier and a depolarizing cation
