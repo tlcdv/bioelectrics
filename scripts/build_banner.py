@@ -1,6 +1,6 @@
 """Generate the README banner.
 
-It matches the banner of the main project (black ground, a circled-dot mark, the
+It matches the banner of the main project (black ground, the project emblem, the
 name in a bold serif, an uppercase sans subtitle) and adds one thing that is not
 decoration: the map on the right is computed by this library. It is the steady
 state of a 22x22 ion-level tissue holding a depolarized domain, and the light
@@ -22,14 +22,17 @@ import matplotlib.pyplot as plt  # noqa: E402
 import torch  # noqa: E402
 from matplotlib.collections import LineCollection  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm  # noqa: E402
-from matplotlib.patches import Circle  # noqa: E402
 
 from bioelectrics.attractors import find_steady_state  # noqa: E402
 from bioelectrics.constants import DTYPE  # noqa: E402
 from bioelectrics.ionic import CAT_DEP_CAM, K_IR_CAM, ChannelExpression, IonicTissue  # noqa: E402
 from bioelectrics.viz import ionic_closed_junctions  # noqa: E402
 
-OUT = Path(__file__).resolve().parent.parent / "assets" / "banner.png"
+ASSETS = Path(__file__).resolve().parent.parent / "assets"
+OUT = ASSETS / "banner.png"
+# The project emblem, on a transparent background. On black its disc reads as a
+# very dark brown, so the emblem keeps a visible edge.
+LOGO = ASSETS / "logo.png"
 N = 22
 
 BLACK = "#000000"
@@ -67,20 +70,17 @@ def main() -> None:
     v, segs = compute()
     fig = plt.figure(figsize=(10.0, 2.38), dpi=200, facecolor=BLACK)
 
-    # The mark: a ring and a centred dot, as on the main project's banner.
-    mark = fig.add_axes([0.035, 0.18, 0.12, 0.64])
-    mark.set_aspect("equal")
-    mark.add_patch(Circle((0.5, 0.5), 0.42, fill=False, lw=3.4, ec=WHITE))
-    mark.add_patch(Circle((0.5, 0.5), 0.085, fc=WHITE, ec="none"))
-    mark.set_xlim(0, 1)
-    mark.set_ylim(0, 1)
+    # The project emblem, held to the left edge of its box at its own aspect ratio.
+    mark = fig.add_axes([0.022, 0.07, 0.20, 0.86])
+    mark.imshow(plt.imread(LOGO), interpolation="lanczos")
+    mark.set_anchor("W")
     mark.axis("off")
 
-    fig.text(0.175, 0.56, "bioelectrics", fontsize=40, fontweight="bold", color=WHITE,
+    fig.text(0.245, 0.56, "bioelectrics", fontsize=40, fontweight="bold", color=WHITE,
              family=["Georgia", "DejaVu Serif"], va="center")
-    fig.text(0.178, 0.30, "DIFFERENTIABLE SOMATIC BIOELECTRICITY  |  PYTORCH",
+    fig.text(0.248, 0.30, "DIFFERENTIABLE SOMATIC BIOELECTRICITY  |  PYTORCH",
              fontsize=10.5, color=WHITE, family=["Arial", "DejaVu Sans"], va="center")
-    fig.text(0.178, 0.17, "theConsciousness.ai  ·  open source", fontsize=8.5, color=DIM,
+    fig.text(0.248, 0.17, "theConsciousness.ai  ·  open source", fontsize=8.5, color=DIM,
              family=["Arial", "DejaVu Sans"], va="center")
 
     # A thin clay rule between the words and the data.
