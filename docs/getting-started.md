@@ -3,11 +3,17 @@
 ## Install
 
 ```bash
+pip install bioelectrics
+```
+
+Or, to run the tests and the examples:
+
+```bash
 git clone https://github.com/tlcdv/bioelectrics.git
 cd bioelectrics
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"      # Windows: .venv\Scripts\pip
-.venv/bin/python -m pytest             # 72 tests, about 5 minutes on a laptop CPU
+.venv/bin/python -m pytest             # 89 tests, about 5 minutes on a laptop CPU
 ```
 
 Python 3.10 or later and PyTorch 2.0 or later. A GPU is not required.

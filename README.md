@@ -2,6 +2,11 @@
 
 **A differentiable engine for somatic bioelectricity, in PyTorch.**
 
+[![PyPI](https://img.shields.io/pypi/v/bioelectrics)](https://pypi.org/project/bioelectrics/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23531183.svg)](https://doi.org/10.5281/zenodo.23531183)
+[![Tests](https://github.com/tlcdv/bioelectrics/actions/workflows/tests.yml/badge.svg)](https://github.com/tlcdv/bioelectrics/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Documentation: <https://tlcdv.github.io/bioelectrics/> — with
 [four runnable tutorials](https://tlcdv.github.io/bioelectrics/tutorials/) that open in
 Colab with no installation — including a
@@ -61,11 +66,17 @@ The full protocol tables are in [`assets/ionic_protocols.md`](assets/ionic_proto
 ## Installation
 
 ```bash
+pip install bioelectrics
+```
+
+Or, to run the tests and the examples:
+
+```bash
 git clone https://github.com/tlcdv/bioelectrics.git
 cd bioelectrics
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"      # Windows: .venv\Scripts\pip
-.venv/bin/python -m pytest             # about 3 minutes on a laptop CPU
+.venv/bin/python -m pytest             # 89 tests, about 5 minutes on a laptop CPU
 ```
 
 Requires Python ≥ 3.10 and PyTorch ≥ 2.0. A GPU is not required.
@@ -181,8 +192,9 @@ Planned:
 
 ## Contributing and citation
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). If you use the library, cite it with
-[`CITATION.cff`](CITATION.cff), and cite the papers of the models you use.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). If you use the library, cite it by its DOI,
+<https://doi.org/10.5281/zenodo.23531183>, which always resolves to the current version, and cite the
+papers of the models you use. [`CITATION.cff`](CITATION.cff) carries the full entry.
 
 ## References
 

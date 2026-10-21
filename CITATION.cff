@@ -5,6 +5,7 @@ type: software
 authors:
   - name: "The bioelectrics contributors"
 version: 0.3.0
+doi: "10.5281/zenodo.23531183"
 license: MIT
 repository-code: "https://github.com/tlcdv/bioelectrics"
 url: "https://tlcdv.github.io/bioelectrics/"
