@@ -2,7 +2,9 @@
 
 **A differentiable engine for somatic bioelectricity, in PyTorch.**
 
-Documentation: <https://tlcdv.github.io/bioelectrics/> — including a
+Documentation: <https://tlcdv.github.io/bioelectrics/> — with
+[four runnable tutorials](https://tlcdv.github.io/bioelectrics/tutorials/) that open in
+Colab with no installation — including a
 [validation page](https://tlcdv.github.io/bioelectrics/validation/) whose every number is
 recomputed from this code, and a
 [limitations page](https://tlcdv.github.io/bioelectrics/limitations/).

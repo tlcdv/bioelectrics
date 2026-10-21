@@ -25,3 +25,11 @@ jobs:
           python -m pip install -e ".[dev]"
       - name: Run tests with coverage
         run: python -m pytest --cov=bioelectrics --cov-report=term-missing -q
+
+      # The notebooks are executed, not just parsed, so a tutorial that no longer
+      # runs fails the build. One job is enough; the physics is covered above.
+      - name: Execute the tutorial notebooks
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: |
+          python -m pip install -e ".[notebooks]"
+          python -m pytest --nbmake notebooks/ -q

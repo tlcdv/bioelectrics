@@ -20,6 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov>=4"]
+notebooks = ["nbmake>=1.5", "matplotlib"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

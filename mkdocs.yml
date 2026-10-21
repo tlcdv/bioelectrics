@@ -45,6 +45,7 @@ extra_javascript:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Tutorials: tutorials.md
   - Validation: validation.md
   - Physics: physics.md
   - Limitations: limitations.md
