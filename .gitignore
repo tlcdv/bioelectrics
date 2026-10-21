@@ -7,3 +7,5 @@ dist/
 build/
 .coverage
 site/
+dist/
+*.egg-info/

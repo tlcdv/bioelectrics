@@ -1,15 +1,32 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "bioelectrics"
-version = "0.2.0"
+version = "0.3.0"
 description = "Differentiable somatic bioelectricity: ion-level tissue physics, published model zoo, and inverse design of lab interventions in PyTorch"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 authors = [{ name = "The bioelectrics contributors" }]
+keywords = [
+    "bioelectricity", "membrane potential", "gap junctions", "ion channels",
+    "morphogenesis", "developmental biology", "differentiable simulation", "pytorch",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Typing :: Typed",
+]
+
 dependencies = [
     "torch>=2.0",
     "numpy>=1.24",
@@ -17,6 +34,13 @@ dependencies = [
     "matplotlib>=3.7",
     "networkx>=3.0",
 ]
+
+[project.urls]
+Homepage = "https://tlcdv.github.io/bioelectrics/"
+Documentation = "https://tlcdv.github.io/bioelectrics/"
+Repository = "https://github.com/tlcdv/bioelectrics"
+Issues = "https://github.com/tlcdv/bioelectrics/issues"
+Validation = "https://tlcdv.github.io/bioelectrics/validation/"
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov>=4"]

@@ -4,9 +4,10 @@ title: "bioelectrics: a differentiable engine for somatic bioelectricity"
 type: software
 authors:
   - name: "The bioelectrics contributors"
-version: 0.2.0
+version: 0.3.0
 license: MIT
 repository-code: "https://github.com/tlcdv/bioelectrics"
+url: "https://tlcdv.github.io/bioelectrics/"
 keywords:
   - bioelectricity
   - membrane potential

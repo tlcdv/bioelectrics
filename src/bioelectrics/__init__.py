@@ -31,4 +31,4 @@ from .gap_junctions import GapJunctionProfile, gj_conductance, grid_conductances
 from .integrators import euler_step, integrate, integrate_adaptive, integrate_rosenbrock, rk4_step
 from .tissue import BioelectricState, Tissue, tumor_prepattern
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
