@@ -30,9 +30,9 @@ from bioelectrics.viz import ionic_closed_junctions  # noqa: E402
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 OUT = ASSETS / "banner.png"
-# The project emblem, on a transparent background. On black its disc reads as a
-# very dark brown, so the emblem keeps a visible edge.
-LOGO = ASSETS / "logo.png"
+# The bioelectrics emblem: a two-headed planarian at the centre of the project
+# emblem, built by scripts/build_emblem.py. Transparent background.
+LOGO = ASSETS / "emblem.png"
 N = 22
 
 BLACK = "#000000"
@@ -70,7 +70,7 @@ def main() -> None:
     v, segs = compute()
     fig = plt.figure(figsize=(10.0, 2.38), dpi=200, facecolor=BLACK)
 
-    # The project emblem, held to the left edge of its box at its own aspect ratio.
+    # The emblem, held to the left edge of its box at its own aspect ratio.
     mark = fig.add_axes([0.022, 0.07, 0.20, 0.86])
     mark.imshow(plt.imread(LOGO), interpolation="lanczos")
     mark.set_anchor("W")
