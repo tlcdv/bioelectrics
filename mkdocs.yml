@@ -1,0 +1,50 @@
+site_name: bioelectrics
+site_description: A differentiable engine for somatic bioelectricity, in PyTorch.
+site_url: https://tlcdv.github.io/bioelectrics/
+repo_url: https://github.com/tlcdv/bioelectrics
+repo_name: tlcdv/bioelectrics
+edit_uri: ""
+
+theme:
+  name: material
+  font:
+    text: Newsreader
+    code: PT Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: {icon: material/weather-sunny, name: Light mode}
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - assets/theme.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.highlight: {anchor_linenums: true}
+  - pymdownx.superfences
+  - pymdownx.arithmatex: {generic: true}
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Validation: validation.md
+  - Physics: physics.md
+  - Limitations: limitations.md

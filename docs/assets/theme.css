@@ -1,0 +1,14 @@
+/* The ivory palette of the figures, so the site and the plots are one piece. */
+:root {
+  --md-primary-fg-color: #1f1e1d;
+  --md-accent-fg-color: #d97757;
+  --md-default-bg-color: #f0eee6;
+  --md-typeset-a-color: #b1553c;
+}
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0b0c0e;
+  --md-primary-fg-color: #0b0c0e;
+  --md-accent-fg-color: #e08e6f;
+  --md-typeset-a-color: #e08e6f;
+}
+.md-typeset table:not([class]) { font-size: .72rem; }

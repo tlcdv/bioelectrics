@@ -1,0 +1,52 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the package and the docs tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e .
+          python -m pip install mkdocs-material
+      # The validation page is generated from real runs, and the script exits
+      # non-zero if any check falls outside its tolerance. A number that no longer
+      # holds therefore fails the build instead of being published as if it did.
+      # The page is not diffed against the committed copy, because the last digits
+      # of a float legitimately differ between platforms.
+      - name: Regenerate the validation page
+        run: python scripts/build_validation.py
+      - name: Build the site
+        run: mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

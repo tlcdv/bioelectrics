@@ -2,6 +2,11 @@
 
 **A differentiable engine for somatic bioelectricity, in PyTorch.**
 
+Documentation: <https://tlcdv.github.io/bioelectrics/> — including a
+[validation page](https://tlcdv.github.io/bioelectrics/validation/) whose every number is
+recomputed from this code, and a
+[limitations page](https://tlcdv.github.io/bioelectrics/limitations/).
+
 `bioelectrics` simulates the membrane potential (V_mem) of non-neural tissues at the
 level of ions, channels, pumps and gap junctions, and computes exact gradients of any
 outcome with respect to any parameter. It uses these gradients for the **bioelectric
