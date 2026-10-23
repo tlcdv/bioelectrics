@@ -3,7 +3,9 @@ message: "If you use bioelectrics in your research, please cite it as below, and
 title: "bioelectrics: a differentiable engine for somatic bioelectricity"
 type: software
 authors:
-  - name: "The bioelectrics contributors"
+  - family-names: Romero
+    given-names: Cesar
+    orcid: "https://orcid.org/0009-0005-9538-9390"
 version: 0.3.0
 doi: "10.5281/zenodo.23531183"
 license: MIT
