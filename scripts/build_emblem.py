@@ -10,6 +10,10 @@ spikes and starfield stay.
 
 Run:    python scripts/build_emblem.py <planarian image>
 Output: assets/emblem.png (transparent background)
+
+Brand look (2026-11-25): assets/banner.png and assets/emblem.png are now the glass versions of the project
+brand (glass case, pink #E34455 lines, black ground, "The Consciousness Research"). This script still draws the
+older look, so do not re-run it to rebuild the committed files unless it is updated to the new look first.
 """
 
 from __future__ import annotations

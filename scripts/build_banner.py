@@ -8,6 +8,10 @@ segments are the gap junctions that the domain's own voltage has closed.
 
 Run:    python scripts/build_banner.py
 Output: assets/banner.png (2000x476, shown at 1000x238 in the README)
+
+Brand look (2026-11-25): assets/banner.png and assets/emblem.png are now the glass versions of the project
+brand (glass case, pink #E34455 lines, black ground, "The Consciousness Research"). This script still draws the
+older look, so do not re-run it to rebuild the committed files unless it is updated to the new look first.
 """
 
 from __future__ import annotations
